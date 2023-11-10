@@ -70,11 +70,11 @@ TORCHBEAST_DIR="$THIRDPARTY_DIR"/torchbeast
 MVFST_DIR="$THIRDPARTY_DIR"/mvfst
 MVFST_DIR_TEMP="$THIRDPARTY_DIR"/mvfst_temp
 GRPC_DIR="$THIRDPARTY_DIR"/grpc
-MAHIMAHI_DIR="$THIRDPARTY_DIR"/mahimahi
+MAHIMAHI_DIR="$DEPS_DIR"/mahimahi
 
 
 function setup_pantheon() {
-  #echo -e "Installing Pantheon dependencies"
+  echo -e "Installing Pantheon dependencies"
   cd "$PANTHEON_DIR"
   sudo apt-get -y install python2.7
   sudo rm /usr/bin/python2
@@ -89,7 +89,8 @@ function setup_pantheon() {
   python2 -m pip install matplotlib numpy tabulate pyyaml
 
   # Install pantheon tunnel in the conda env.
-  cd third_party/pantheon-tunnel && ./autogen.sh \
+  cd third_party/pantheon_tunnel && ./autogen.sh \
+  && make clean \
   && ./configure --prefix="$PREFIX" \
   && make -j && sudo make install
 
@@ -120,8 +121,8 @@ function setup_mahimahi() {
   # with setuid bit.
   sudo cp /usr/local/bin/mm-* "$PREFIX"/bin/
   sudo chown root:root "$PREFIX"/bin/mm-*
-  sudo chmod 4755 "$PREFIX"/bin/mm-*y
-  
+  sudo chmod 4755 "$PREFIX"/bin/mm-*
+
   #conda install -y -c anaconda protobuf=3.12.3
   echo -e "Done installing mahimahi"
 
@@ -198,6 +199,6 @@ fi
 setup_libtorch
 setup_mvfst
 
-#echo -e "Building mvfst-rl"
+echo -e "Building mvfst-rl"
 sudo chmod +x "$BASE_DIR"/build.sh
 cd "$BASE_DIR" && ./build.sh $BUILD_ARGS
