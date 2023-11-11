@@ -70,7 +70,7 @@ TORCHBEAST_DIR="$THIRDPARTY_DIR"/torchbeast
 MVFST_DIR="$THIRDPARTY_DIR"/mvfst
 MVFST_DIR_TEMP="$THIRDPARTY_DIR"/mvfst_temp
 GRPC_DIR="$THIRDPARTY_DIR"/grpc
-MAHIMAHI_DIR="$THIRDPARTY_DIR"/mahimahi
+MAHIMAHI_DIR="$DEPS_DIR"/mahimahi
 
 
 function setup_pantheon() {

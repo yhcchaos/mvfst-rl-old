@@ -5,11 +5,11 @@
 [submodule "_build/deps/mahimahi"]
 	path = _build/deps/mahimahi
 	url = git@github.com:yhcchaos/mahimahi.git
-	branch = master
+	branch = dev
 [submodule "third-party/mvfst"]
 	path = third-party/mvfst
 	url = git@github.com:yhcchaos/mvfst-old.git
-	branch = master
+	branch = dev
 [submodule "third-party/grpc"]
 	path = third-party/grpc
 	url = https://github.com/grpc/grpc.git
