@@ -7,7 +7,6 @@
 *
 */
 #pragma once
-
 #include <folly/io/async/EventBaseManager.h>
 #include <folly/io/async/HHWheelTimer.h>
 #include <glog/logging.h>
@@ -52,7 +51,8 @@ class CongestionControlEnv {
 
     std::vector<NetworkState> states;
     std::vector<History> history;
-
+    std::vector<float> rewards;
+    std::vector<float> env;
    private:
     const Config& cfg_;
   };
@@ -114,7 +114,7 @@ class CongestionControlEnv {
 
   void observationTimeoutExpired() noexcept;
   void handleStates();
-  float computeReward(const std::vector<NetworkState>& states);
+  std::vector<float> computeReward(const std::vector<NetworkState>& states);
   void updateCwnd(const uint32_t actionIdx);
 
   inline bool useStateSummary() const {
@@ -150,5 +150,6 @@ std::ostream& operator<<(std::ostream& os,
                          const CongestionControlEnv::Observation& observation);
 std::ostream& operator<<(std::ostream& os,
                          const CongestionControlEnv::History& history);
+
 
 }  // namespace quic

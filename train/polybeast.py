@@ -21,7 +21,6 @@ import threading
 import time
 import timeit
 import traceback
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -218,15 +217,17 @@ class Net(nn.Module):
         input_size = functools.reduce(operator.mul, observation_shape, 1)
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
-
+        
         # FC output size + last reward.
         core_output_size = self.fc2.out_features + 2
 
         if use_lstm:
             self.core = nn.LSTM(core_output_size, core_output_size, num_layers=1)
-
+            
+        self.fc3 = nn.Linear(9, core_output_size)
+        self.fc4 = nn.Linear(core_output_size, core_output_size)
         self.policy = nn.Linear(core_output_size, self.num_actions)
-        self.baseline = nn.Linear(core_output_size, 1)
+        self.baseline = nn.Linear(core_output_size * 2, 1)
 
     def initial_state(self, batch_size=1):
         # Always return a tuple of two tensors so torch script type-checking
@@ -248,9 +249,12 @@ class Net(nn.Module):
         T, B, *_ = x.shape
         x = torch.flatten(x, 0, 1)  # Merge time and batch.
         x = x.view(T * B, -1)
+        v=x[:, -9:]
+        x=x[:, 0:-9]
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-
+        v = F.relu(self.fc3(v))
+        v = F.relu(self.fc4(v))
         randomness = torch.normal(torch.zeros((T * B, 2), device= x.device))
         core_input = torch.cat([x, randomness], dim=-1)
 
@@ -270,8 +274,9 @@ class Net(nn.Module):
         else:
             core_output = core_input
 
+        baseline_inputs = torch.cat((core_output, v), dim=-1)
         policy_logits = self.policy(core_output)
-        baseline = self.baseline(core_output)
+        baseline = self.baseline(baseline_inputs)
 
         if self.training:
             action = torch.multinomial(F.softmax(policy_logits, dim=1), num_samples=1)
@@ -595,7 +600,7 @@ def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
             time.sleep(5)
             end_step = stats.get("step", 0)
 
-            if timeit.default_timer() - last_checkpoint_time > 30 * 60:
+            if stats.get("step", 0) > 5000000 and timeit.default_timer() - last_checkpoint_time > 30 * 60:
                 # Save every 30 min.
                 checkpoint(stats.get("step", 0))
                 last_checkpoint_time = timeit.default_timer()
