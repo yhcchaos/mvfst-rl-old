@@ -67,8 +67,10 @@ def init_logdirs(flags):
     else:
         os.makedirs(flags.logdir, exist_ok=True)
         os.makedirs(flags.savedir, exist_ok=True)
-
-    #flags.checkpoint = os.path.join(flags.base_logdir, "checkpoint.tar")
+    checkpoint_dir = os.path.join(flags.base_logdir, "checkpoints")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    if( flags.checkpoint is None ):
+        flags.checkpoint = os.path.join(checkpoint_dir, "checkpoint.tar")
     #flags.traced_model = os.path.join(flags.base_logdir, "traced_model.pt")
 
     if flags.mode != "train":

@@ -51,9 +51,11 @@ void CongestionControlEnv::onAction(const Action& action) {
     const auto& elapsed = std::chrono::duration<float, std::milli>(
         std::chrono::steady_clock::now() - lastActionTime_);
     lastActionTime_ = std::chrono::steady_clock::now();
+    /*
     VLOG(1) << "Action updated (cwndAction=" << action.cwndAction
             << ", cwnd=" << cwndBytes_ / conn_.udpSendPacketLen
             << "), policy elapsed time = " << elapsed.count() << " ms";
+    */
   });
 }
 
@@ -88,11 +90,18 @@ void CongestionControlEnv::handleStates() {
   }
 
   // Compute reward based on original states
-  const auto& reward = computeReward(states_);
+  const auto& rewards = computeReward(states_);
 
   Observation obs(cfg_);
   obs.states = useStateSummary() ? stateSummary(states_) : std::move(states_);
   states_.clear();
+  //{bw_reward, delay_reward, loss_reward, reward};
+  obs.rewards = rewards;
+  obs.env.resize(4);
+  obs.env[0]=cfg_.bandwidth / 10;
+  obs.env[1]=cfg_.delay / 10;
+  obs.env[2]=cfg_.lossRatio;
+  obs.env[3]=cfg_.flows;
   std::copy(history_.begin(), history_.end(), std::back_inserter(obs.history));
 
   VLOG(2) << __func__ << ' ' << obs;
@@ -100,7 +109,7 @@ void CongestionControlEnv::handleStates() {
   lastObservationTime_ = std::chrono::steady_clock::now();
 
   float episodeWeight = 1.0 / float(cfg_.flows);
-  onObservation(std::move(obs), reward, episodeWeight);
+  onObservation(std::move(obs), rewards[4], episodeWeight);
 }
 
 std::vector<NetworkState> CongestionControlEnv::stateSummary(
@@ -130,7 +139,7 @@ std::vector<NetworkState> CongestionControlEnv::stateSummary(
   return summaryStates;
 }
 
-float CongestionControlEnv::computeReward(
+std::vector<float> CongestionControlEnv::computeReward(
     const std::vector<NetworkState>& states) {
   // Reward function is a combinaton of throughput, delay and lost bytes.
   // For throughput and delay, it makes sense to take the average, whereas
@@ -144,7 +153,6 @@ float CongestionControlEnv::computeReward(
     totalLost += state[Field::LOST];
   }
   avgLrtt = states.size() > 0 ? avgLrtt / states.size() : cfg_.delay * 2;
-
   const auto& elapsed = std::chrono::duration<float, std::milli>(
         std::chrono::steady_clock::now() - lastObservationTime_);
 
@@ -157,17 +165,34 @@ float CongestionControlEnv::computeReward(
   // Ignore cfg_.maxDelayInReward for now.
   float avgQDelayMs = avgLrttMs - cfg_.delay * 2;
   float lossMbps = totalLost * normBytes() * kBytesToMB / elapsed.count() * 1000 * 8;
-
-  float reward = cfg_.throughputFactor * std::min(goodputMbps / cfg_.bandwidth * float(cfg_.flows), float(1)) -
-                 cfg_.delayFactor * avgQDelayMs -
-                 cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / cfg_.bandwidth * float(cfg_.flows);
-  VLOG(1) << "Num states = " << states.size()
+  float df = cfg_.delayFactor;
+  if(goodputMbps > cfg_.bandwidth / float(cfg_.flows)){
+      df = cfg_.delayFactor * cfg_.flows;
+  }
+  else{
+    if(cfg_.flows>1){
+      df=0;
+    }
+  }
+  float bw_reward = cfg_.throughputFactor * std::min(goodputMbps / cfg_.bandwidth * float(cfg_.flows), float(1));
+  float delay_reward = avgQDelayMs;
+  float delay_reward_all = df * delay_reward;
+  float loss_reward =  cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / cfg_.bandwidth * float(cfg_.flows);
+  float reward = bw_reward - delay_reward_all - loss_reward;
+  /*VLOG(1) << "bw_reward = " << bw_reward
+          << ", delay_reward = " << delay_reward
+          << ", delay_factor = " << df
+          << ", avgQDelayMs = " << avgQDelayMs
+          << ", flows = " << cfg_.flows 
+          << ", loss_reward = " << loss_reward
+          << "Num states = " << states.size()
           << " avg throughput = " << goodputMbps
           << " Mbps, avg LRTT = " << avgLrttMs
           << " ms, avg delay = " << avgQDelayMs
           << " ms, loss = " << lossMbps << " Mbps, reward = " << reward
           << " state elapsed time = " << elapsed.count() << " ms";
-  return reward;
+  */  
+  return {bw_reward, delay_reward, delay_reward_all, loss_reward, reward};
 }
 
 void CongestionControlEnv::updateCwnd(const uint32_t actionIdx) {
@@ -219,7 +244,7 @@ void CongestionControlEnv::Observation::toTensor(torch::Tensor& tensor) const {
   CHECK_EQ(history.size(), cfg_.historySize);
 
   // Total dim = flattened state dim + history dim.
-  uint32_t dim = states.size() * states[0].size() + history.size();
+  uint32_t dim = states.size() * states[0].size() + history.size() + 9;
 
   tensor.resize_({dim});
   auto tensor_a = tensor.accessor<float, 1>();
@@ -236,7 +261,14 @@ void CongestionControlEnv::Observation::toTensor(torch::Tensor& tensor) const {
   for (const auto& h : history) {
     tensor_a[x++] = h.action;
   }
+  
+  for(int i=0;i<5;i++){
+    tensor_a[x++] = rewards[i];
+  }
 
+  for(int i=0;i<4;i++){
+    tensor_a[x++] = env[i];
+  }
   CHECK_EQ(x, dim);
 }
 

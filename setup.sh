@@ -120,8 +120,8 @@ function setup_mahimahi() {
   # with setuid bit.
   sudo cp /usr/local/bin/mm-* "$PREFIX"/bin/
   sudo chown root:root "$PREFIX"/bin/mm-*
-  sudo chmod 4755 "$PREFIX"/bin/mm-*y
-  
+  sudo chmod 4755 "$PREFIX"/bin/mm-*
+
   #conda install -y -c anaconda protobuf=3.12.3
   echo -e "Done installing mahimahi"
 

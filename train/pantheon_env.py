@@ -19,6 +19,7 @@ import threading
 import time
 import numpy as np
 import itertools as it
+import json
 
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
@@ -189,7 +190,9 @@ def train_run(flags, jobs, thread_id):
             if type(value) is dict:
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
-                param_dict[param] = random.sample(np.arange(*value).tolist(), 1)[0]
+                param_dict[param] = random.sample(np.linspace(*value, dtype=int).tolist(), 1)[0]
+        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        param_dict["queue"] = param_dict["queue"] * bdp
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
         cmd = update_cmd(cmd, flags, param_dict)
@@ -315,6 +318,8 @@ def get_pantheon_emulated_jobs(flags):
         # 3. Expand parameter combinations for testing
         if flags.mode == "train":
             jobs.append((job_cfg, cmd_tmpl))
+            with open(os.path.join(flags.logdir, 'train_env_params.json'), 'w') as f:
+                json.dump(job_cfg['params'], f)
         else:
             param_keys = job_cfg["params"].keys()
             for param in param_keys:
@@ -322,7 +327,9 @@ def get_pantheon_emulated_jobs(flags):
                 if type(value) is dict:
                     job_cfg["params"][param] = list(value.keys())
                 elif type(value) is list:
-                    job_cfg["params"][param] = np.arange(*value).tolist()
+                    job_cfg["params"][param] = np.linspace(*value, dtype=int).tolist()
+            with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
+                json.dump(job_cfg['params'], f)
             param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
                                        else [job_cfg["params"][param]]
                                        for param in job_cfg["params"]))
