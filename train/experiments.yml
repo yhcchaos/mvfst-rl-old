@@ -26,11 +26,11 @@ emu:
       desc: >-
         A training scenario
       params:
-        flows: [1, 3, 3]
-        bandwidth: [12, 156, 5]
-        queue: [1, 10, 4]
-        loss_ratio: [0.01, 1, 4]
-        delay: [5, 85, 5]
+        flows: {1, 2}
+        bandwidth: {12, 24, 48, 96, 192}
+        queue: {0.5, 1, 2, 4, 8, 16}
+        loss_ratio: {0.005, 0.01, 0.02, 0.04, 0.08, 0.16}
+        delay: {5, 85, 5}
       command: >-
         {test_path} {common_param_set} --runtime 30 -f {flows}
         --uplink-trace {traces_dir}/{bandwidth}mbps.trace
