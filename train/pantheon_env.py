@@ -174,12 +174,11 @@ def train_run(flags, jobs, thread_id):
     randomly chosen job in parallel.
     """
     pantheon_env = get_pantheon_env(flags)
-    episode = 0
+    episode = 1
     while True:
         # Pick a random experiment to run
         job_id = random.choice(range(len(jobs)))
         job_cfg, cmd_tmpl = jobs[job_id]
-
         # Expand data_dir in cmd template
         data_dir = path.join(
             flags.logdir, "train_tid{}_run{}_expt{}".format(thread_id, episode, job_id)
@@ -195,7 +194,7 @@ def train_run(flags, jobs, thread_id):
         param_dict["queue"] = param_dict["queue"] * bdp
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-        cmd = update_cmd(cmd, flags, param_dict)
+        cmd = update_cmd(cmd, flags, param_dict, thread_id, episode)
 
         logging.info(
             "Thread: {}, episode: {}, experiment: {}, cmd: {}".format(
@@ -354,7 +353,7 @@ def get_pantheon_env(flags):
     return pantheon_env
 
 
-def update_cmd(cmd, flags, params=None):
+def update_cmd(cmd, flags, params=None, actor_id=0, episode_id=0):
     if flags.mode == "train":
         schemes = "mvfst_rl"
         run_times = 1
@@ -371,6 +370,8 @@ def update_cmd(cmd, flags, params=None):
             "--cc_env_mode={}".format(flags.cc_env_mode),
             "--cc_env_rpc_address={}".format(flags.server_address),
             "--cc_env_model_file={}".format(flags.traced_model),
+            "--cc_env_episode_id={}".format(episode_id),
+            "--cc_env_actor_id={}".format(actor_id),
             "--cc_env_agg={}".format(flags.cc_env_agg),
             "--cc_env_time_window_ms={}".format(flags.cc_env_time_window_ms),
             "--cc_env_fixed_window_size={}".format(flags.cc_env_fixed_window_size),

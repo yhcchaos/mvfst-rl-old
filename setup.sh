@@ -187,10 +187,10 @@ function setup_mvfst() {
   echo -e "Done installing mvfst"
 }
 
-git submodule sync && proxychains git submodule update --init --recursive --progress
+git submodule sync && git submodule update --init --recursive --progress
 
 if [ "$INFERENCE" = false ]; then
-    setup_pantheon
+    #setup_pantheon
     setup_mahimahi
     setup_grpc
     setup_torchbeast

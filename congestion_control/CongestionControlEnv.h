@@ -19,6 +19,9 @@
 
 #include "CongestionControlEnvConfig.h"
 #include "NetworkState.h"
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <string>
 
 namespace quic {
 
@@ -59,7 +62,7 @@ class CongestionControlEnv {
 
   CongestionControlEnv(const Config& cfg, Callback* cob,
                        const QuicConnectionStateBase& conn);
-  virtual ~CongestionControlEnv() = default;
+  virtual ~CongestionControlEnv();
 
   /**
    * To be invoked by whoever owns CongestionControlEnv (such as
@@ -67,11 +70,9 @@ class CongestionControlEnv {
    * Ack/Loss event.
    */
   void onNetworkState(NetworkState&& state);
-
   inline const Config& config() const { return cfg_; }
   inline float normMs() const { return cfg_.normMs; }
   inline float normBytes() const { return cfg_.normBytes; }
-
  protected:
   /**
    * onObservation() will be triggered when there are enough state updates to
@@ -144,6 +145,10 @@ class CongestionControlEnv {
 
   std::chrono::time_point<std::chrono::steady_clock> lastObservationTime_;
   std::chrono::time_point<std::chrono::steady_clock> lastActionTime_;
+public:
+  static int64_t shm_id;
+  static key_t shm_key;
+  static float* shm_addr;
 };
 
 std::ostream& operator<<(std::ostream& os,

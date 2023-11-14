@@ -50,7 +50,8 @@ struct CongestionControlEnvConfig {
   // For use in training to uniquely identify an actor across episodic
   // connections to RL server.
   int64_t actorId{0};
-
+  int64_t flowId{0};
+  int64_t episode_id{0};
   Aggregation aggregation{Aggregation::TIME_WINDOW};
   std::chrono::milliseconds windowDuration{100};  // Time window duration
   uint32_t windowSize{10};                        // Fixed window size

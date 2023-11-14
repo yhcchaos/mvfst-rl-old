@@ -7,18 +7,25 @@
 *
 */
 #include "CongestionControlEnv.h"
-
+#include <iostream>
 #include <folly/Conv.h>
 #include <quic/congestion_control/CongestionControlFunctions.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <csignal>
 
 namespace quic {
 
 using Field = NetworkState::Field;
 
 static const float kBytesToMB = 1.0 / 1024 / 1024;
-
 /// CongestionControlEnv impl
-
+void handler(int sig){
+  shmdt((void*)CongestionControlEnv::shm_addr);
+  shmctl(CongestionControlEnv::shm_id, IPC_RMID, 0);
+  exit(1);
+}
 CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
                                            const QuicConnectionStateBase& conn)
     : cfg_(cfg),
@@ -31,13 +38,28 @@ CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
   History noopHistory(0.0);
   history_.resize(cfg.historySize, noopHistory);
   lastTdp_ = 10 * conn_.udpSendPacketLen;
-
+  shm_key = static_cast<key_t>((cfg_.actorId << 16) | cfg_.episode_id);
+  shm_id = shmget(shm_key, sizeof(float) * cfg_.flows, IPC_CREAT | 0666);
+  std::cout<<"dsafdsfadsfadsfadsfadsfadsfadsf-----------------------------";
+  /*std::cerr << shm_key << " " << shm_id << " " <<  cfg_.flows << " " << cfg_.flowId << std::endl;
+  if(shm_id == -1){
+    perror("shm create error( ");
+  }
+  */
+  shm_addr = (float*)shmat(shm_id, 0, 0);
+  kill(getpid(), SIGTERM);
+  std::signal(SIGTERM, handler);
   if (cfg.aggregation == Config::Aggregation::TIME_WINDOW) {
     CHECK_GT(cfg.windowDuration.count(), 0);
     observationTimeout_.schedule(cfg.windowDuration);
   }
 }
 
+CongestionControlEnv::~CongestionControlEnv(){
+  shmdt((void*)shm_addr);
+  shmctl(shm_id, IPC_RMID, 0);
+
+}
 void CongestionControlEnv::onAction(const Action& action) {
   evb_->runImmediatelyOrRunInEventBaseThreadAndWait([this, action] {
     float prevCwndBytes = cwndBytes_;
@@ -165,33 +187,46 @@ std::vector<float> CongestionControlEnv::computeReward(
   // Ignore cfg_.maxDelayInReward for now.
   float avgQDelayMs = avgLrttMs - cfg_.delay * 2;
   float lossMbps = totalLost * normBytes() * kBytesToMB / elapsed.count() * 1000 * 8;
-  float df = cfg_.delayFactor;
-  if(goodputMbps > cfg_.bandwidth / float(cfg_.flows)){
-      df = cfg_.delayFactor * cfg_.flows;
-  }
-  else{
-    if(cfg_.flows>1){
-      df=0;
+
+  float bw_share = cfg_.bandwidth / float(cfg_.flows);
+  float exceed_sum = 0;
+  float reg = 1;
+  this->shm_addr[cfg_.flowId - 1] = std::max(goodputMbps - bw_share, float(0));
+  for(uint32_t i=0;i<cfg_.flows;i++){
+    std::cerr << this->shm_addr[i] << " ";
+    if(shm_addr[i] > 0){
+      exceed_sum += shm_addr[i];
     }
   }
+  std::cerr << std::endl;
+  float shared_error = (this->shm_addr[cfg_.flowId - 1] == 0 ? 0 : this->shm_addr[cfg_.flowId - 1] / exceed_sum);
+  VLOG(1) << "exceed_sum= " << exceed_sum << ", " << "shared_error = " << shared_error << std::endl;
+  reg = shared_error * cfg_.flows;
+  if(cfg_.flows == 1){
+    reg = 1;
+  }
+  //  VLOG(1) << "shared_error= " << shared_error;
   float bw_reward = cfg_.throughputFactor * std::min(goodputMbps / cfg_.bandwidth * float(cfg_.flows), float(1));
   float delay_reward = avgQDelayMs;
-  float delay_reward_all = df * delay_reward;
+  float delay_reward_all =  cfg_.delayFactor * delay_reward * reg;
   float loss_reward =  cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / cfg_.bandwidth * float(cfg_.flows);
   float reward = bw_reward - delay_reward_all - loss_reward;
-  /*VLOG(1) << "bw_reward = " << bw_reward
-          << ", delay_reward = " << delay_reward
-          << ", delay_factor = " << df
-          << ", avgQDelayMs = " << avgQDelayMs
-          << ", flows = " << cfg_.flows 
-          << ", loss_reward = " << loss_reward
-          << "Num states = " << states.size()
+  VLOG(1) //<< "bw_reward = " << bw_reward
+          //<< ", delay_reward = " << delay_reward
+          //<< ", delay_factor = " << df
+          //<< ", avgQDelayMs = " << avgQDelayMs
+          << "flows = " << cfg_.flows 
+          << " bw_share = " << bw_share
+          //<< ", loss_reward = " << loss_reward
+          //<< "Num states = " << states.size()
+          << " actor id = " << cfg_.actorId
+          << " flow Id = " << cfg_.flowId
           << " avg throughput = " << goodputMbps
           << " Mbps, avg LRTT = " << avgLrttMs
           << " ms, avg delay = " << avgQDelayMs
           << " ms, loss = " << lossMbps << " Mbps, reward = " << reward
           << " state elapsed time = " << elapsed.count() << " ms";
-  */  
+  VLOG(1)<< "---------------------------------------------------------------------------------------------";
   return {bw_reward, delay_reward, delay_reward_all, loss_reward, reward};
 }
 
