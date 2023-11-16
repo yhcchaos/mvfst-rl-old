@@ -24,7 +24,7 @@ import traceback
 import torch
 from torch import nn
 from torch.nn import functional as F
-
+from datetime import datetime
 from train import common, utils
 from train.constants import TORCHBEAST_ROOT
 
@@ -426,9 +426,8 @@ def learn(
         stats["entropy_loss"] = entropy_loss.item()
 
         stats["learner_queue_size"] = learner_queue.size()
-
         plogger.log(stats)
-
+        
         if not len(episode_returns):
             # Hide the mean-of-empty-tuple NaN as it scares people.
             stats["mean_episode_return"] = None
@@ -600,8 +599,8 @@ def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
             time.sleep(5)
             end_step = stats.get("step", 0)
 
-            if stats.get("step", 0) > 5000000 and timeit.default_timer() - last_checkpoint_time > 30 * 60:
-                # Save every 30 min.
+            if timeit.default_timer() - last_checkpoint_time > 120 * 60:
+                # Save every 120 min.
                 checkpoint(stats.get("step", 0))
                 last_checkpoint_time = timeit.default_timer()
 
@@ -622,7 +621,8 @@ def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
     else:
         logging.info("Learning finished after %i steps.", stats["step"])
         checkpoint(stats.get("step", 0))
-
+    train_finish = {"training":"done", "finish_time":str(date)}
+    plogger.log(train_finish)
     # Done with learning. Let's stop all the ongoing work.
     inference_batcher.close()
     learner_queue.close()

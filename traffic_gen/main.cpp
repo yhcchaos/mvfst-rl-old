@@ -7,7 +7,8 @@
 *
 */
 #include <glog/logging.h>
-
+#include <sys/shm.h>
+#include <csignal>
 #include <fizz/crypto/Utils.h>
 #include <folly/init/Init.h>
 #include <folly/portability/GFlags.h>
@@ -71,6 +72,17 @@ DEFINE_double(cc_env_delay, 0.0, "Connection delay (ms)");
 DEFINE_double(cc_env_loss_ratio, 0.0, "Connection loss rate (%)");
 DEFINE_int32(cc_env_flows, 1, "Number of flows");
 
+int64_t shm_id=-1;
+void* shm_addr=nullptr;
+
+void sighandler(int sig){
+  std::cerr << "receive SIGTERM signal, exit. ";
+  std::cerr << "release shared memory. " << "shm_id: " << shm_id << ", shm_addr: " << shm_addr << std::endl;
+  shmdt(shm_addr);
+  shmctl(shm_id, IPC_RMID, 0);
+  exit(1);
+}
+
 using namespace quic::traffic_gen;
 using Config = quic::CongestionControlEnv::Config;
 
@@ -93,6 +105,7 @@ makeRLCongestionControllerFactory() {
   cfg.actorId = FLAGS_cc_env_actor_id;
   cfg.flowId = FLAGS_cc_env_flow_id;
   cfg.episode_id = FLAGS_cc_env_episode_id;
+  std::signal(SIGTERM, sighandler);
   if (FLAGS_cc_env_agg == "time") {
     cfg.aggregation = Config::Aggregation::TIME_WINDOW;
   } else if (FLAGS_cc_env_agg == "fixed") {
@@ -122,7 +135,7 @@ makeRLCongestionControllerFactory() {
   cfg.flows = FLAGS_cc_env_flows;
 
   auto envFactory = std::make_shared<quic::CongestionControlEnvFactory>(cfg);
-  return std::make_shared<quic::RLCongestionControllerFactory>(envFactory);
+  return std::make_shared<quic::RLCongestionControllerFactory>(envFactory, &shm_id, &shm_addr);
 }
 
 int main(int argc, char* argv[]) {

@@ -7,6 +7,7 @@ logs/
 train/logs/
 scripts/logs/
 checkpoint.tar*
+core*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

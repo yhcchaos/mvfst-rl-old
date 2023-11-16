@@ -21,13 +21,15 @@ using Field = NetworkState::Field;
 
 RLCongestionController::RLCongestionController(
     QuicConnectionStateBase& conn,
-    std::shared_ptr<CongestionControlEnvFactory> envFactory)
+    std::shared_ptr<CongestionControlEnvFactory> envFactory, int64_t* shm_id_addr, void** shm_addr_addr)
     : conn_(conn),
       cwndBytes_(conn.transportSettings.initCwndInMss * conn.udpSendPacketLen),
       env_(envFactory->make(this, conn)),
       minRTTFilter_(kMinRTTWindowLength.count(), 0us, 0),
       standingRTTFilter_(100000, /*100ms*/
                          0us, 0) {
+  *shm_id_addr = env_->getShm_id();
+  *shm_addr_addr = env_->getShm_addr();
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_ << " "
            << conn_;

@@ -26,7 +26,7 @@ class RLCongestionController : public CongestionController,
  public:
   RLCongestionController(
       QuicConnectionStateBase& conn,
-      std::shared_ptr<CongestionControlEnvFactory> envFactory);
+      std::shared_ptr<CongestionControlEnvFactory> envFactory, int64_t* shm_id_addr, void** shm_addr_addr);
 
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacket& packet) override;

@@ -20,12 +20,7 @@ namespace quic {
 using Field = NetworkState::Field;
 
 static const float kBytesToMB = 1.0 / 1024 / 1024;
-/// CongestionControlEnv impl
-void handler(int sig){
-  shmdt((void*)CongestionControlEnv::shm_addr);
-  shmctl(CongestionControlEnv::shm_id, IPC_RMID, 0);
-  exit(1);
-}
+// CongestionControlEnv impl
 CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
                                            const QuicConnectionStateBase& conn)
     : cfg_(cfg),
@@ -40,15 +35,19 @@ CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
   lastTdp_ = 10 * conn_.udpSendPacketLen;
   shm_key = static_cast<key_t>((cfg_.actorId << 16) | cfg_.episode_id);
   shm_id = shmget(shm_key, sizeof(float) * cfg_.flows, IPC_CREAT | 0666);
-  std::cout<<"dsafdsfadsfadsfadsfadsfadsfadsf-----------------------------";
+  shm_addr = (float*)shmat(shm_id, 0, 0);
+  
+  if(shm_id == -1 || shm_addr == nullptr){
+    int64_t pgid = getpgid(getpid());
+    VLOG(1) << "没有获得共享内存句柄，或共享内存关联失败,杀死该环境中所有流的进程";
+    kill(-pgid, SIGTERM);
+  } 
   /*std::cerr << shm_key << " " << shm_id << " " <<  cfg_.flows << " " << cfg_.flowId << std::endl;
   if(shm_id == -1){
     perror("shm create error( ");
   }
   */
-  shm_addr = (float*)shmat(shm_id, 0, 0);
-  kill(getpid(), SIGTERM);
-  std::signal(SIGTERM, handler);
+  
   if (cfg.aggregation == Config::Aggregation::TIME_WINDOW) {
     CHECK_GT(cfg.windowDuration.count(), 0);
     observationTimeout_.schedule(cfg.windowDuration);
@@ -191,16 +190,17 @@ std::vector<float> CongestionControlEnv::computeReward(
   float bw_share = cfg_.bandwidth / float(cfg_.flows);
   float exceed_sum = 0;
   float reg = 1;
-  this->shm_addr[cfg_.flowId - 1] = std::max(goodputMbps - bw_share, float(0));
+  float exceed_bw = std::max(goodputMbps - bw_share, float(0));
+  shm_addr[cfg_.flowId - 1] = exceed_bw;
   for(uint32_t i=0;i<cfg_.flows;i++){
-    std::cerr << this->shm_addr[i] << " ";
+    //std::cerr << this->shm_addr[i] << " ";
     if(shm_addr[i] > 0){
       exceed_sum += shm_addr[i];
     }
   }
-  std::cerr << std::endl;
-  float shared_error = (this->shm_addr[cfg_.flowId - 1] == 0 ? 0 : this->shm_addr[cfg_.flowId - 1] / exceed_sum);
-  VLOG(1) << "exceed_sum= " << exceed_sum << ", " << "shared_error = " << shared_error << std::endl;
+  //std::cerr << std::endl;
+  float shared_error = (exceed_bw == 0 ? 0 : exceed_bw / exceed_sum);
+  //VLOG(1) << "exceed_sum= " << exceed_sum << ", " << "shared_error = " << shared_error << std::endl;
   reg = shared_error * cfg_.flows;
   if(cfg_.flows == 1){
     reg = 1;
@@ -211,10 +211,13 @@ std::vector<float> CongestionControlEnv::computeReward(
   float delay_reward_all =  cfg_.delayFactor * delay_reward * reg;
   float loss_reward =  cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / cfg_.bandwidth * float(cfg_.flows);
   float reward = bw_reward - delay_reward_all - loss_reward;
+  /*
   VLOG(1) //<< "bw_reward = " << bw_reward
           //<< ", delay_reward = " << delay_reward
           //<< ", delay_factor = " << df
           //<< ", avgQDelayMs = " << avgQDelayMs
+          << "pid= " << getpid()
+          << " pgid = " << getpgid(getpid())
           << "flows = " << cfg_.flows 
           << " bw_share = " << bw_share
           //<< ", loss_reward = " << loss_reward
@@ -227,6 +230,7 @@ std::vector<float> CongestionControlEnv::computeReward(
           << " ms, loss = " << lossMbps << " Mbps, reward = " << reward
           << " state elapsed time = " << elapsed.count() << " ms";
   VLOG(1)<< "---------------------------------------------------------------------------------------------";
+  */
   return {bw_reward, delay_reward, delay_reward_all, loss_reward, reward};
 }
 

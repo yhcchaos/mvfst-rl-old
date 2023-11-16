@@ -145,10 +145,18 @@ class CongestionControlEnv {
 
   std::chrono::time_point<std::chrono::steady_clock> lastObservationTime_;
   std::chrono::time_point<std::chrono::steady_clock> lastActionTime_;
-public:
-  static int64_t shm_id;
-  static key_t shm_key;
-  static float* shm_addr;
+
+  int64_t shm_id;
+  key_t shm_key;
+  float* shm_addr;
+ public:
+  int64_t getShm_id(){
+    return shm_id;
+  }
+  void* getShm_addr(){
+    return shm_addr;
+  }
+  
 };
 
 std::ostream& operator<<(std::ostream& os,

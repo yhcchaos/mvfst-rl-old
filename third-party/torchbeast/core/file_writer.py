@@ -60,7 +60,7 @@ class FileWriter:
             )
         self.xpid = xpid
         self._tick = 0
-
+        self.first_log_time = None
         # metadata gathering
         if xp_args is None:
             xp_args = {}
@@ -149,8 +149,16 @@ class FileWriter:
         else:
             to_log["_tick"] = self._tick
             self._tick += 1
-        to_log["_time"] = time.time()
-
+        now = datetime.datetime.now()
+        if self.first_log_time == None:
+            self.first_log_time = now
+        time_delta = now - self.first_log_time
+        to_log["_time"] = "{:0>2}:{:0>2}:{:0>2}".format(
+            time_delta.seconds // 3600,
+            (time_delta.seconds % 3600) // 60, 
+            time_delta.seconds % 60
+        )
+        to_log["time"] = now.strftime("%Y-%m-%d-%H:%M:%S")
         old_len = len(self.fieldnames)
         for k in to_log:
             if k not in self.fieldnames:
@@ -162,13 +170,13 @@ class FileWriter:
         if to_log["_tick"] == 0:
             self._logfile.write("# %s\n" % ",".join(self.fieldnames))
             self._logfile.flush()
-
+        
         if verbose:
             self._logger.info(
                 "LOG | %s",
                 ", ".join(["{}: {}".format(k, to_log[k]) for k in sorted(to_log)]),
             )
-
+        
         self._logwriter.writerow(to_log)
         self._logfile.flush()
 

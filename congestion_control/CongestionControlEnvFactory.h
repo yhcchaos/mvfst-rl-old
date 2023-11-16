@@ -20,7 +20,7 @@ namespace quic {
 class CongestionControlEnvFactory {
  public:
   CongestionControlEnvFactory(const CongestionControlEnv::Config& cfg)
-      : cfg_(cfg) {}
+      : cfg_(cfg){}
 
   std::unique_ptr<CongestionControlEnv> make(
       CongestionControlEnv::Callback* cob,
