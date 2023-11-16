@@ -79,7 +79,7 @@ function setup_pantheon() {
   sudo apt-get -y install python2.7
   sudo rm /usr/bin/python2
   sudo ln -s /usr/bin/python2.7 /usr/bin/python2
-  curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output tmp_get-pip.py
+  proxychains curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output tmp_get-pip.py
   sudo python2 tmp_get-pip.py
   rm -f tmp_get-pip.py
 
@@ -120,7 +120,7 @@ function setup_mahimahi() {
   # with setuid bit.
   sudo cp /usr/local/bin/mm-* "$PREFIX"/bin/
   sudo chown root:root "$PREFIX"/bin/mm-*
-  sudo chmod 4755 "$PREFIX"/bin/mm-*y
+  sudo chmod 4755 "$PREFIX"/bin/mm-*
   
   #conda install -y -c anaconda protobuf=3.12.3
   echo -e "Done installing mahimahi"
