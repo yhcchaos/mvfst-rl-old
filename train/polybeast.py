@@ -43,7 +43,7 @@ def add_args(parser):
 
     # Model output settings.
     parser.add_argument(
-        "--checkpoint", default="checkpoint.tar", help="File to write checkpoints to."
+        "--checkpoint",  help="File to write checkpoints to."
     )
 
     # Model settings.
