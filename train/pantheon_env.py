@@ -44,14 +44,14 @@ def add_args(parser):
     )
     parser.add_argument(
             "--fig_col",
-            type=int,
-            default=12,
+            type=float,
+            default=24,
             help="Column size in the merged test figure",
     )
     parser.add_argument(
             "--fig_row",
-            type=int,
-            default=10,
+            type= float, 
+            default=24,
             help="Row size in the merged test figure",
     )
     parser.add_argument(
@@ -219,7 +219,7 @@ def train_run(flags, jobs, thread_id):
     randomly chosen job in parallel.
     """
     pantheon_env = get_pantheon_env(flags)
-    episode = 0
+    episode = 1
     while True:
         # Pick a random experiment to run
         job_id = random.choice(range(len(jobs)))
@@ -235,12 +235,13 @@ def train_run(flags, jobs, thread_id):
             if type(value) is dict:
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
-                param_dict[param] = random.sample(np.linspace(*value, dtype=int).tolist(), 1)[0]
+                param_dict[param] = random.sample(value, 1)[0]
         bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
         param_dict["queue"] = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-        cmd = update_cmd(cmd, flags, param_dict)
+        cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
+
         logging.info(
             "Thread: {}, episode: {}, experiment: {}, cmd: {}".format(
                 thread_id, episode, job_id, " ".join(cmd)
@@ -261,7 +262,7 @@ def test_run(flags, meta, jobs, thread_id):
     """
     job_id = thread_id % len(jobs)
     job_cfg, cmd_tmpl = jobs[job_id]
-
+    episode = 1
     # Expand data_dir in cmd template
     data_dir = path.join(flags.logdir, "f{},b{:03d},q{:02d},l{},d{:02d}"
                          .format(job_cfg["params"]["flows"], 
@@ -269,9 +270,12 @@ def test_run(flags, meta, jobs, thread_id):
                                  job_cfg["params"]["queue"], 
                                  job_cfg["params"]["loss_ratio"], 
                                  job_cfg["params"]["delay"]))
+    bdp = job_cfg["params"]["bandwidth"] * 1000 * job_cfg["params"]["delay"] * 2 / 8 / 1500
+    job_cfg["params"]["queue"] = int(job_cfg["params"]["queue"] * bdp)
     cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-    cmd = update_cmd(cmd, flags)
+    cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg["params"])
+
     # Run tests
     logging.info(
         "Test run: thread {} -> job {}, cmd: {}".format(
@@ -279,6 +283,7 @@ def test_run(flags, meta, jobs, thread_id):
         )
     )
     pantheon_env = get_pantheon_env(flags)
+    
     p = subprocess.Popen(cmd, env=pantheon_env)
     p.wait()
 
@@ -372,8 +377,6 @@ def get_pantheon_emulated_jobs(flags):
                 value = job_cfg["params"][param]
                 if type(value) is dict:
                     job_cfg["params"][param] = list(value.keys())
-                elif type(value) is list:
-                    job_cfg["params"][param] = np.linspace(*value, dtype=int).tolist()
             with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
                 json.dump(job_cfg['params'], f)
             param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
@@ -400,7 +403,7 @@ def get_pantheon_env(flags):
     return pantheon_env
 
 
-def update_cmd(cmd, flags, params=None):
+def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     if flags.mode == "train":
         schemes = "mvfst_rl"
         run_times = 1
@@ -417,6 +420,8 @@ def update_cmd(cmd, flags, params=None):
             "--cc_env_mode={}".format(flags.cc_env_mode),
             "--cc_env_rpc_address={}".format(flags.server_address),
             "--cc_env_model_file={}".format(flags.traced_model),
+            "--cc_env_episode_id={}".format(episode_id),
+            "--cc_env_actor_id={}".format(actor_id),
             "--cc_env_agg={}".format(flags.cc_env_agg),
             "--cc_env_time_window_ms={}".format(flags.cc_env_time_window_ms),
             "--cc_env_fixed_window_size={}".format(flags.cc_env_fixed_window_size),
