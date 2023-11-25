@@ -76,7 +76,7 @@ def add_args(parser):
     parser.add_argument(
         "--num_actors",
         type=int,
-        default=0,
+        default=10,
         help="Number of parallel actors for training. Default 0 starts one actor process per pantheon job.",
     )
     parser.add_argument(
@@ -165,7 +165,7 @@ def add_args(parser):
     parser.add_argument(
         "--cc_env_history_size",
         type=int,
-        default=8,
+        default=20,
         help="Length of history (such as past actions) to include in observation",
     )
     parser.add_argument(
@@ -195,13 +195,13 @@ def add_args(parser):
     parser.add_argument(
         "--cc_env_reward_delay_factor",
         type=float,
-        default=0.01,
+        default=0.02,
         help="Delay multiplier in reward",
     )
     parser.add_argument(
         "--cc_env_reward_packet_loss_factor",
         type=float,
-        default=1.0,
+        default=2.0,
         help="Packet loss multiplier in reward",
     )
     parser.add_argument(
