@@ -15,7 +15,7 @@ set -eu
 # Make sure your default python in conda env in python2.7 with an explicit
 # python3 command pointing to python 3.7
 # ArgumentParser
-
+MAHI_TUNNEL=false
 INFERENCE=false
 SKIP_MVFST_DEPS=false
 POSITIONAL=()
@@ -29,6 +29,10 @@ while [[ $# -gt 0 ]]; do
     --skip-mvfst-deps )
       # If --skip-mvfst-deps is specified, don't get mvfst's dependencies.
       SKIP_MVFST_DEPS=true
+      shift;;
+    --mahi-tun )
+      # If --skip-mvfst-deps is specified, don't get mvfst's dependencies.
+      MAHI_TUNNEL=true
       shift;;
     * )    # Unknown option
       POSITIONAL+=("$1") # Save it in an array for later
@@ -74,7 +78,7 @@ MAHIMAHI_DIR="$DEPS_DIR"/mahimahi
 
 
 function setup_pantheon() {
-  #echo -e "Installing Pantheon dependencies"
+  echo -e "Installing Pantheon dependencies"
   cd "$PANTHEON_DIR"
   sudo apt-get -y install python2.7
   sudo rm /usr/bin/python2
@@ -89,7 +93,8 @@ function setup_pantheon() {
   python2 -m pip install matplotlib numpy tabulate pyyaml
 
   # Install pantheon tunnel in the conda env.
-  cd third_party/pantheon-tunnel && ./autogen.sh \
+  cd third_party/pantheon_tunnel && ./autogen.sh \
+  && make clean \
   && ./configure --prefix="$PREFIX" \
   && make -j && sudo make install
 
@@ -110,10 +115,8 @@ function setup_mahimahi() {
                           iptables pkg-config dnsmasq-base apache2-bin debhelper libssl-dev \
                           ssl-cert libxcb-present-dev libcairo2-dev libpango1.0-dev apache2-dev
   cd "$MAHIMAHI_DIR"
-  #conda uninstall -y protobuf=3.12.3
   ./autogen.sh
   ./configure
-  make clean
   make
   sudo make install
   # Copy mahimahi binaries to conda env (to be able to run in cluster)
@@ -122,7 +125,6 @@ function setup_mahimahi() {
   sudo chown root:root "$PREFIX"/bin/mm-*
   sudo chmod 4755 "$PREFIX"/bin/mm-*
 
-  #conda install -y -c anaconda protobuf=3.12.3
   echo -e "Done installing mahimahi"
 
 }
@@ -187,17 +189,74 @@ function setup_mvfst() {
   echo -e "Done installing mvfst"
 }
 
-git submodule sync && git submodule update --init --recursive --progress
+function setup_mahimahi_tunnel() {
+  #setup_pantheon_tunnel
+  cd "$PANTHEON_DIR"
+  #sudo apt-get -y install ntp ntpdate texlive python-pip
+  #sudo apt-get -y install debhelper autotools-dev dh-autoreconf iptables \
+  #                        pkg-config iproute2 dnsmasq
+  #python2 -m pip install matplotlib numpy tabulate pyyaml
 
-if [ "$INFERENCE" = false ]; then
-    #setup_pantheon
+  # Install pantheon tunnel in the conda env.
+  if [ -e "/usr/local/bin/mm-delay" ]; then
+    sudo rm /usr/local/bin/mm-*
+  fi
+  if [ -e "$PREFIX/bin/mm-delay" ]; then
+    sudo rm $PREFIX/bin/mm-*
+  fi
+  
+  cd third_party/pantheon_tunnel && ./autogen.sh \
+  && make clean \
+  && ./configure --prefix="$PREFIX" \
+  && make -j && sudo make install
+
+  #setup mahimahi
+  #if [ ! $(grep /usr/lib /etc/ld.so.conf.d/libc.conf) ];then
+  #  sudo sh -c "echo '/usr/lib' >> /etc/ld.so.conf.d/libc.conf"
+  #  sudo ldconfig
+  #fi
+  #sudo apt-get install -y protobuf-compiler libprotobuf-dev autotools-dev dh-autoreconf \
+  #                        iptables pkg-config dnsmasq-base apache2-bin debhelper libssl-dev \
+  #                        ssl-cert libxcb-present-dev libcairo2-dev libpango1.0-dev apache2-dev
+  cd "$BASE_DIR" && cd "$MAHIMAHI_DIR"
+  if conda list -n "mvfst-rl" | grep -q "protobuf"; then
+    conda uninstall -y protobuf=3.12.3
+  fi
+  ./autogen.sh
+  make clean
+  ./configure
+  make
+  sudo make install
+  # Copy mahimahi binaries to conda env (to be able to run in cluster)
+  # with setuid bit.
+  sudo cp /usr/local/bin/mm-* "$PREFIX"/bin/
+  sudo chown root:root "$PREFIX"/bin/mm-*
+  sudo chmod 4755 "$PREFIX"/bin/mm-*
+
+  if ! conda list -n "mvfst-rl" | grep -q "protobuf"; then
+    conda install -y -c anaconda protobuf=3.12.3
+  fi
+  echo -e "Done installing mahimahi"
+
+}
+
+if [ "$MAHI_TUNNEL" = true ]; then
+  setup_mahimahi_tunnel
+else
+  git submodule sync && proxychains git submodule update --init --recursive --progress
+  if [ "$INFERENCE" = false ]; then
+    setup_pantheon
     setup_mahimahi
     setup_grpc
     setup_torchbeast
+  fi
+  setup_libtorch
+  setup_mvfst
+  echo -e "Building mvfst-rl"
+  sudo chmod +x "$BASE_DIR"/build.sh
+  cd "$BASE_DIR" && ./build.sh $BUILD_ARGS
 fi
-setup_libtorch
-setup_mvfst
 
-#echo -e "Building mvfst-rl"
-sudo chmod +x "$BASE_DIR"/build.sh
-cd "$BASE_DIR" && ./build.sh $BUILD_ARGS
+    
+
+

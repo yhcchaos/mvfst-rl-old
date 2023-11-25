@@ -20,6 +20,7 @@ import time
 import numpy as np
 import itertools as it
 import json
+import train.merge_test_results_module as mtrm
 
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
@@ -28,6 +29,50 @@ logging.basicConfig(level=logging.INFO)
 
 
 def add_args(parser):
+    #--merge test results args
+    parser.add_argument(
+            "--cc_scheme",
+            type=str,
+            default="mvfst_rl",
+            help="Congestion control scheme to use",
+    )
+    parser.add_argument(
+            "--num_columns",
+            type=int,
+            default=5,
+            help="Number of columns in the merged test figure",
+    )
+    parser.add_argument(
+            "--fig_col",
+            type=float,
+            default=24,
+            help="Column size in the merged test figure",
+    )
+    parser.add_argument(
+            "--fig_row",
+            type= float, 
+            default=24,
+            help="Row size in the merged test figure",
+    )
+    parser.add_argument(
+            "--dpi",
+            type=int,
+            default=100,
+            help="big figure's dpi",
+    )
+    parser.add_argument(
+            "--merge_results",
+            action="store_true",
+            help="do we merge the test results' figures into on big figure?",
+    )
+    
+    #--
+    parser.add_argument(
+        "--do_log",
+        action = 'store_true', 
+        help="do we log during the training or test process",
+    )
+    #--
     parser.add_argument(
         "--num_actors",
         type=int,
@@ -189,9 +234,9 @@ def train_run(flags, jobs, thread_id):
             if type(value) is dict:
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
-                param_dict[param] = random.sample(np.linspace(*value, dtype=int).tolist(), 1)[0]
-        #bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        #param_dict["queue"] = param_dict["queue"] * bdp
+                param_dict[param] = random.sample(value, 1)[0]
+        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        param_dict["queue"] = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
         cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
@@ -218,17 +263,17 @@ def test_run(flags, meta, jobs, thread_id):
     job_cfg, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
-    data_dir = path.join(flags.logdir, "f{},b{},q{},l{},d{}"
+    data_dir = path.join(flags.logdir, "f{},b{:03d},q{:02d},l{},d{:02d}"
                          .format(job_cfg["params"]["flows"], 
                                  job_cfg["params"]["bandwidth"], 
                                  job_cfg["params"]["queue"], 
                                  job_cfg["params"]["loss_ratio"], 
                                  job_cfg["params"]["delay"]))
-    #bdp = job_cfg["params"]["bandwidth"] * 1000 * job_cfg["params"]["delay"] * 2 / 8 / 1500
-    #job_cfg["params"]["queue"] = job_cfg["params"]["queue"] * bdp
+    bdp = job_cfg["params"]["bandwidth"] * 1000 * job_cfg["params"]["delay"] * 2 / 8 / 1500
+    job_cfg["params"]["queue"] = int(job_cfg["params"]["queue"] * bdp)
     cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-    cmd = update_cmd(cmd, flags, thread_id, episode)
+    cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg["params"])
 
     # Run tests
     logging.info(
@@ -237,6 +282,7 @@ def test_run(flags, meta, jobs, thread_id):
         )
     )
     pantheon_env = get_pantheon_env(flags)
+    
     p = subprocess.Popen(cmd, env=pantheon_env)
     p.wait()
 
@@ -302,8 +348,11 @@ def run_pantheon_test(flags, meta, jobs, num_threads, run_fn):
             for thread in threads:
                 thread.join()
             threads = []
-    
     logging.info("Done with {}.".format(flags.mode))
+    if(flags.merge_results):
+        logging.info("Merge results...")
+        mtrm.merge_test_results(flags.cc_scheme, flags.logdir, flags.num_columns, flags.fig_col, flags.fig_row, flags.dpi)
+    
 
 
 def get_pantheon_emulated_jobs(flags):
@@ -327,8 +376,6 @@ def get_pantheon_emulated_jobs(flags):
                 value = job_cfg["params"][param]
                 if type(value) is dict:
                     job_cfg["params"][param] = list(value.keys())
-                elif type(value) is list:
-                    job_cfg["params"][param] = np.linspace(*value, dtype=int).tolist()
             with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
                 json.dump(job_cfg['params'], f)
             param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
@@ -402,13 +449,13 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
             ])
     return shlex.split(cmd) + [
         "--run-times={}".format(run_times),
-        '--extra-sender-args="{}"'.format(extra_sender_args),
-    ] + (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else [])
+        '--extra-sender-args="{}"'.format(extra_sender_args)] + \
+        (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
+        (["--do_log"] if flags.do_log == True else [])
 
 
 def main(flags):
     meta, all_jobs = get_pantheon_emulated_jobs(flags)
-
     # Filter jobs to use for training
     if flags.job_ids and flags.mode == "train":
         job_ids = [int(job_id) for job_id in flags.job_ids.split(",")]

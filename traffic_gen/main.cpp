@@ -33,7 +33,7 @@ DEFINE_int64(cc_env_actor_id, 0,
 DEFINE_int64(cc_env_flow_id, 0,
              "flow id");
 DEFINE_int64(cc_env_episode_id, 0,
-             "");
+             "episode id");
 DEFINE_string(cc_env_model_file, "traced_model.pt",
               "PyTorch traced model file for local mode");
 DEFINE_string(
@@ -103,8 +103,8 @@ makeRLCongestionControllerFactory() {
   cfg.modelFile = FLAGS_cc_env_model_file;
   cfg.rpcAddress = FLAGS_cc_env_rpc_address;
   cfg.actorId = FLAGS_cc_env_actor_id;
-  cfg.flowId = FLAGS_cc_env_flow_id;
   cfg.episode_id = FLAGS_cc_env_episode_id;
+  cfg.flowId = FLAGS_cc_env_flow_id;
   std::signal(SIGTERM, sighandler);
   if (FLAGS_cc_env_agg == "time") {
     cfg.aggregation = Config::Aggregation::TIME_WINDOW;
