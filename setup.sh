@@ -205,10 +205,12 @@ function setup_mahimahi_tunnel() {
     sudo rm $PREFIX/bin/mm-*
   fi
   
-  cd third_party/pantheon_tunnel && ./autogen.sh \
-  && make clean \
-  && ./configure --prefix="$PREFIX" \
-  && make -j && sudo make install
+  cd third_party/pantheon_tunnel
+  ./autogen.sh
+  #&& make clean \
+  ./configure --prefix="$PREFIX"
+  make -j
+  sudo make install
 
   #setup mahimahi
   #if [ ! $(grep /usr/lib /etc/ld.so.conf.d/libc.conf) ];then
