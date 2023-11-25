@@ -190,11 +190,11 @@ def train_run(flags, jobs, thread_id):
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
                 param_dict[param] = random.sample(np.linspace(*value, dtype=int).tolist(), 1)[0]
-        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        param_dict["queue"] = param_dict["queue"] * bdp
+        #bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        #param_dict["queue"] = param_dict["queue"] * bdp
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-        cmd = update_cmd(cmd, flags, param_dict, thread_id, episode)
+        cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
 
         logging.info(
             "Thread: {}, episode: {}, experiment: {}, cmd: {}".format(
@@ -216,7 +216,7 @@ def test_run(flags, meta, jobs, thread_id):
     """
     job_id = thread_id % len(jobs)
     job_cfg, cmd_tmpl = jobs[job_id]
-
+    episode = 1
     # Expand data_dir in cmd template
     data_dir = path.join(flags.logdir, "f{},b{},q{},l{},d{}"
                          .format(job_cfg["params"]["flows"], 
@@ -224,9 +224,11 @@ def test_run(flags, meta, jobs, thread_id):
                                  job_cfg["params"]["queue"], 
                                  job_cfg["params"]["loss_ratio"], 
                                  job_cfg["params"]["delay"]))
+    #bdp = job_cfg["params"]["bandwidth"] * 1000 * job_cfg["params"]["delay"] * 2 / 8 / 1500
+    #job_cfg["params"]["queue"] = job_cfg["params"]["queue"] * bdp
     cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-    cmd = update_cmd(cmd, flags)
+    cmd = update_cmd(cmd, flags, thread_id, episode)
 
     # Run tests
     logging.info(
@@ -353,7 +355,7 @@ def get_pantheon_env(flags):
     return pantheon_env
 
 
-def update_cmd(cmd, flags, params=None, actor_id=0, episode_id=0):
+def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     if flags.mode == "train":
         schemes = "mvfst_rl"
         run_times = 1

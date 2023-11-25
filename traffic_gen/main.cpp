@@ -31,7 +31,7 @@ DEFINE_int64(cc_env_actor_id, 0,
              "For use in training to uniquely identify an actor across "
              "episodic connections to RL server.");
 DEFINE_int64(cc_env_flow_id, 0,
-             "");
+             "flow id");
 DEFINE_int64(cc_env_episode_id, 0,
              "");
 DEFINE_string(cc_env_model_file, "traced_model.pt",
