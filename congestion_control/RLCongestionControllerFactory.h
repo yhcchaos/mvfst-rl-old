@@ -24,8 +24,12 @@ struct QuicConnectionStateBase;
 class RLCongestionControllerFactory : public CongestionControllerFactory {
  public:
   RLCongestionControllerFactory(
-      std::shared_ptr<CongestionControlEnvFactory> envFactory, int64_t* shm_id_addr_, void** shm_addr_addr_)
-      : envFactory_(CHECK_NOTNULL(envFactory)), shm_id_addr(shm_id_addr_), shm_addr_addr(shm_addr_addr_) {}
+      std::shared_ptr<CongestionControlEnvFactory> envFactory, 
+      int64_t* shm_id_addr_, void** shm_addr_addr_, 
+      int64_t* shm_id_addr_link_, void** shm_addr_addr_link_)
+      : envFactory_(CHECK_NOTNULL(envFactory)), 
+      shm_id_addr(shm_id_addr_), shm_addr_addr(shm_addr_addr_), 
+      shm_id_addr_link(shm_id_addr_link_), shm_addr_addr_link(shm_addr_addr_link_) {}
 
   ~RLCongestionControllerFactory() override = default;
 
@@ -33,13 +37,15 @@ class RLCongestionControllerFactory : public CongestionControllerFactory {
       QuicConnectionStateBase& conn, CongestionControlType type) {
     LOG(INFO) << "Creating RLCongestionController";
     conn.transportSettings.pacingEnabled = true;
-    return std::make_unique<RLCongestionController>(conn, envFactory_, shm_id_addr, shm_addr_addr);
+    return std::make_unique<RLCongestionController>(conn, envFactory_, shm_id_addr, shm_addr_addr, shm_id_addr_link, shm_addr_addr_link);
   }
 
  private:
   std::shared_ptr<CongestionControlEnvFactory> envFactory_;
   int64_t* shm_id_addr{nullptr}; 
   void** shm_addr_addr{nullptr};
+  int64_t* shm_id_addr_link{nullptr}; 
+  void** shm_addr_addr_link{nullptr};
 };
 
 }  // namespace quic

@@ -273,7 +273,7 @@ def test_run(flags, meta, jobs, thread_id):
     job_cfg["params"]["queue"] = int(job_cfg["params"]["queue"] * bdp)
     cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-    cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg["params"])
+    cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg)
 
     # Run tests
     logging.info(
@@ -282,11 +282,10 @@ def test_run(flags, meta, jobs, thread_id):
         )
     )
     pantheon_env = get_pantheon_env(flags)
-    
     p = subprocess.Popen(cmd, env=pantheon_env)
     p.wait()
 
-    # Run analysis
+    # Run analysix
     analysis_cmd = [meta["analyze_path"], "--data-dir={}".format(data_dir)]
     logging.info(
         "Thread {}, job {}: Running analysis on {}, cmd: {}".format(
@@ -301,7 +300,7 @@ def test_run(flags, meta, jobs, thread_id):
         path.join(flags.logdir, "test_expt{}.pdf".format(job_id)),
     )
     logging.info(
-        "Test run finished for thread {}, job {}. Results in {}.".format(
+        "Test run finished for thread {}, job {}, Results in {}.".format(
             thread_id, job_id, data_dir
         )
     )
@@ -385,7 +384,7 @@ def get_pantheon_emulated_jobs(flags):
                 param_dict = dict(zip(param_keys, param_values))
                 job_cfg_cpy = job_cfg.copy()
                 job_cfg_cpy["params"] = param_dict
-                jobs.append((job_cfg_cpy, utils.safe_format(cmd_tmpl, param_dict)))
+                jobs.append((job_cfg_cpy, cmd_tmpl))
     return cfg["meta"], jobs
 
 
@@ -403,55 +402,61 @@ def get_pantheon_env(flags):
 
 
 def update_cmd(cmd, flags, actor_id, episode_id, params=None):
+    # in train mode, params = cfg["emu"]["jobs"]["params"]
     if flags.mode == "train":
         schemes = "mvfst_rl"
         run_times = 1
+    # in test mode, params = cfg["emu"]["jobs"]
     else:
-        schemes = " ".join(
+        if flags.test_other:
+            schemes = " ".join(params["schemes"])
+        else:
+            schemes = "mvfst_rl"
+        params = params["params"]
+        run_times = flags.test_runs_per_job
+    extra_sender_args = None
+    if not flags.test_other:
+        extra_sender_args = " ".join(
             [
-                "mvfst_rl",
+                "--cc_env_mode={}".format(flags.cc_env_mode),
+                "--cc_env_rpc_address={}".format(flags.server_address),
+                "--cc_env_model_file={}".format(flags.traced_model),
+                "--cc_env_episode_id={}".format(episode_id),
+                "--cc_env_actor_id={}".format(actor_id+1),
+                "--cc_env_agg={}".format(flags.cc_env_agg),
+                "--cc_env_time_window_ms={}".format(flags.cc_env_time_window_ms),
+                "--cc_env_fixed_window_size={}".format(flags.cc_env_fixed_window_size),
+                "--cc_env_use_state_summary={}".format(flags.cc_env_use_state_summary),
+                "--cc_env_history_size={}".format(flags.cc_env_history_size),
+                "--cc_env_norm_ms={}".format(flags.cc_env_norm_ms),
+                "--cc_env_norm_bytes={}".format(flags.cc_env_norm_bytes),
+                "--cc_env_actions={}".format(flags.cc_env_actions),
+                "--cc_env_reward_throughput_factor={}".format(
+                    flags.cc_env_reward_throughput_factor
+                ),
+                "--cc_env_reward_delay_factor={}".format(flags.cc_env_reward_delay_factor),
+                "--cc_env_reward_packet_loss_factor={}".format(
+                    flags.cc_env_reward_packet_loss_factor
+                ),
+                "--cc_env_reward_max_delay={}".format(flags.cc_env_reward_max_delay),
+                "-v={}".format(flags.loglevel),
             ]
         )
-        run_times = flags.test_runs_per_job
-
-    extra_sender_args = " ".join(
-        [
-            "--cc_env_mode={}".format(flags.cc_env_mode),
-            "--cc_env_rpc_address={}".format(flags.server_address),
-            "--cc_env_model_file={}".format(flags.traced_model),
-            "--cc_env_episode_id={}".format(episode_id),
-            "--cc_env_actor_id={}".format(actor_id),
-            "--cc_env_agg={}".format(flags.cc_env_agg),
-            "--cc_env_time_window_ms={}".format(flags.cc_env_time_window_ms),
-            "--cc_env_fixed_window_size={}".format(flags.cc_env_fixed_window_size),
-            "--cc_env_use_state_summary={}".format(flags.cc_env_use_state_summary),
-            "--cc_env_history_size={}".format(flags.cc_env_history_size),
-            "--cc_env_norm_ms={}".format(flags.cc_env_norm_ms),
-            "--cc_env_norm_bytes={}".format(flags.cc_env_norm_bytes),
-            "--cc_env_actions={}".format(flags.cc_env_actions),
-            "--cc_env_reward_throughput_factor={}".format(
-                flags.cc_env_reward_throughput_factor
-            ),
-            "--cc_env_reward_delay_factor={}".format(flags.cc_env_reward_delay_factor),
-            "--cc_env_reward_packet_loss_factor={}".format(
-                flags.cc_env_reward_packet_loss_factor
-            ),
-            "--cc_env_reward_max_delay={}".format(flags.cc_env_reward_max_delay),
-            "-v={}".format(flags.loglevel),
-        ]
-    )
-    if params:
-        extra_sender_args += " " + " ".join([
-            "--cc_env_bandwidth={}".format(params['bandwidth']),
-            "--cc_env_delay={}".format(params['delay']),
-            "--cc_env_loss_ratio={}".format(params['loss_ratio']),
-            "--cc_env_flows={}".format(params['flows']),
-            ])
-    return shlex.split(cmd) + [
-        "--run-times={}".format(run_times),
-        '--extra-sender-args="{}"'.format(extra_sender_args)] + \
+        if params:
+            extra_sender_args += " " + " ".join([
+                "--cc_env_bandwidth={}".format(params['bandwidth']),
+                "--cc_env_delay={}".format(params['delay']),
+                "--cc_env_loss_ratio={}".format(params['loss_ratio']),
+                "--cc_env_flows={}".format(params['flows']),
+                ]) 
+    #将字符串按照 shell 语法进行分割，生成一个 token 列表。  
+    # #command_line = 'ls -l -a'; tokens = shlex.split(command_line);['ls', '-l', '-a']
+    cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
+            "--actor_id={}".format(actor_id+1), "--episode_id={}".format(episode_id)] + \
+        (['--extra-sender-args="{}"'.format(extra_sender_args)] if extra_sender_args!=None else []) + \
         (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
         (["--do_log"] if flags.do_log == True else [])
+    return cmd
 
 
 def main(flags):

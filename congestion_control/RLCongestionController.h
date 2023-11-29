@@ -20,13 +20,15 @@
 namespace quic {
 
 using namespace std::chrono_literals;
-
 class RLCongestionController : public CongestionController,
                                public CongestionControlEnv::Callback {
  public:
   RLCongestionController(
       QuicConnectionStateBase& conn,
-      std::shared_ptr<CongestionControlEnvFactory> envFactory, int64_t* shm_id_addr, void** shm_addr_addr);
+      std::shared_ptr<CongestionControlEnvFactory> envFactory, 
+      int64_t* shm_id_actor_addr, void** shm_addr_actor_addr, 
+      int64_t* shm_id_link_addr, void** shm_addr_link_addr
+    );
 
   void onRemoveBytesFromInflight(uint64_t) override;
   void onPacketSent(const OutstandingPacket& packet) override;

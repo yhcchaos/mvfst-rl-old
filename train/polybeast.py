@@ -117,24 +117,6 @@ def add_args(parser):
     parser.add_argument(
         "--seed", type=int, default=1234, help="Initial random seed for torch.random"
     )
-
-    # GALA settings.
-    parser.add_argument(
-        "--num_gala_agents", default=1, type=int, help="If > 1, GALA mode is enabled."
-    )
-    parser.add_argument(
-        "--num_gala_peers",
-        type=int,
-        default=1,
-        help="Number of peers to communicate with in each iteration.",
-    )
-    parser.add_argument(
-        "--sync_freq",
-        type=int,
-        default=0,
-        help="Max amount of message staleness for local gossip.",
-    )
-
     # Loss settings.
     parser.add_argument(
         "--entropy_cost", default=0.05, type=float, help="Entropy cost/multiplier."
@@ -326,8 +308,6 @@ def learn(
     stats,
     flags,
     plogger,
-    rank=0,  # Rank of GALA agent
-    gossip_buffer=None,  # Shared buffer for GALA gossip
     lock=threading.Lock(),  # noqa: B008
 ):
     for tensors in learner_queue:
@@ -407,14 +387,7 @@ def learn(
         nn.utils.clip_grad_norm_(model.parameters(), 40.0)
         optimizer.step()
         scheduler.step()
-
-        # Local-Gossip in GALA mode
-        if gossip_buffer is not None:
-            gossip_buffer.write_message(rank, model)
-            gossip_buffer.aggregate_message(rank, model)
-
         actor_model.load_state_dict(model.state_dict())
-
         episode_returns = env_outputs.episode_return[env_outputs.done]
         stats["step"] = stats.get("step", 0) + flags.unroll_length * flags.batch_size
         stats["episode_returns"] = tuple(episode_returns.cpu().numpy())
@@ -435,7 +408,7 @@ def learn(
         lock.release()
 
 
-def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
+def train(flags, device="cuda:0"):
     if flags.xpid is None:
         flags.xpid = "torchbeast-%s" % time.strftime("%Y%m%d-%H%M%S")
     plogger = file_writer.FileWriter(
@@ -549,8 +522,6 @@ def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
                 stats,
                 flags,
                 plogger,
-                rank,
-                gossip_buffer,
             ),
         )
         for i in range(flags.num_learner_threads)
@@ -563,12 +534,6 @@ def train(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
         )
         for i in range(flags.num_inference_threads)
     ]
-
-    # Synchronize GALA agents before starting training
-    if barrier is not None:
-        barrier.wait()
-        logging.info("%s: barrier passed" % rank)
-
     actorpool_thread.start()
     for t in learner_threads + inference_threads:
         t.start()
@@ -762,23 +727,16 @@ def test(flags, **kwargs):
         t.join()
 
 
-def main(flags, rank=0, barrier=None, device="cuda:0", gossip_buffer=None):
+def main(flags, device="cuda:0"):
     torch.random.manual_seed(flags.seed)
 
     # We disable batching in learner as unroll lengths could different across
     # actors due to partial rollouts created by env resets.
     assert flags.batch_size == 1, "Batching in learner not supported currently"
 
-    if flags.mode == "train" and flags.num_gala_agents > 1:
-        # In GALA mode. Force single learner thread per GALA agent.
-        flags.num_learner_threads = 1
-
     flags.observation_shape = (1, 1, flags.observation_length)
     kwargs = {
-        "rank": rank,
-        "barrier": barrier,
         "device": device,
-        "gossip_buffer": gossip_buffer,
     }
 
     def error_fn(flags):

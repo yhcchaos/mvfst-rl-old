@@ -20,3 +20,8 @@ def add_args(parser):
         help="File to write torchscript traced model to (for training) "
         "or read from (for local testing).",
     )
+    parser.add_argument(
+        "--test_other",
+        action="store_true",
+        help="test other cc schemes"
+    )

@@ -72,14 +72,19 @@ DEFINE_double(cc_env_delay, 0.0, "Connection delay (ms)");
 DEFINE_double(cc_env_loss_ratio, 0.0, "Connection loss rate (%)");
 DEFINE_int32(cc_env_flows, 1, "Number of flows");
 
-int64_t shm_id=-1;
-void* shm_addr=nullptr;
-
+//actor shared memory to exchange infomation among actors to compute rewards
+int64_t shm_id = -1;
+void* shm_addr = nullptr;
+//link shared memory to pass link bandwidth to actor
+int64_t shm_id_link = -1;
+void* shm_addr_link = nullptr;
 void sighandler(int sig){
   std::cerr << "receive SIGTERM signal, exit. ";
   std::cerr << "release shared memory. " << "shm_id: " << shm_id << ", shm_addr: " << shm_addr << std::endl;
   shmdt(shm_addr);
   shmctl(shm_id, IPC_RMID, 0);
+  shmdt(shm_addr_link);
+  shmctl(shm_id_link, IPC_RMID, 0);
   exit(1);
 }
 
@@ -135,7 +140,8 @@ makeRLCongestionControllerFactory() {
   cfg.flows = FLAGS_cc_env_flows;
 
   auto envFactory = std::make_shared<quic::CongestionControlEnvFactory>(cfg);
-  return std::make_shared<quic::RLCongestionControllerFactory>(envFactory, &shm_id, &shm_addr);
+  return std::make_shared<quic::RLCongestionControllerFactory>(
+    envFactory, &shm_id, &shm_addr, &shm_id_link, &shm_addr_link);
 }
 
 int main(int argc, char* argv[]) {

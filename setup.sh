@@ -106,6 +106,19 @@ function setup_pantheon() {
   echo -e "Done setting up Pantheon"
 }
 
+function setup_pantheon_dependencies() {
+    echo "Setting up dependencies for Pantheon's CC schemes"
+    # Setup other dependencies so as to be able to run other CC algorithms.
+    # We only use schemes enabled in `pantheon_env.get_test_schemes()` by default,
+    # and skip the `mvfst_*` schemes since everything should be setup already after
+    # this script is done.
+    CC_SCHEMES= "cubic vegas bbr" #ledbat pcc verus sprout quic scream webrtc copa taova vivace pcc_experimental fillp indigo fillp_sheep"
+    sudo apt-get install kmod
+    cd "$PANTHEON_DIR"
+    python2 ./src/experiments/setup.py --install-deps --schemes "${CC_SCHEMES}"
+    python2 ./src/experiments/setup.py --setup --schemes "${CC_SCHEMES}"
+}
+
 function setup_mahimahi() {
   if [ ! $(grep /usr/lib /etc/ld.so.conf.d/libc.conf) ];then
     sudo sh -c "echo '/usr/lib' >> /etc/ld.so.conf.d/libc.conf"
