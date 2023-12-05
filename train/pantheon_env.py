@@ -249,7 +249,7 @@ def train_run(flags, jobs, thread_id):
         p = subprocess.Popen(cmd, env=pantheon_env)
         p.wait()
         episode += 1
-
+        
         # Remove pantheon logs to free up space
         if os.path.exists(data_dir):
             shutil.rmtree(data_dir)

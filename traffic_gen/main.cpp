@@ -72,22 +72,6 @@ DEFINE_double(cc_env_delay, 0.0, "Connection delay (ms)");
 DEFINE_double(cc_env_loss_ratio, 0.0, "Connection loss rate (%)");
 DEFINE_int32(cc_env_flows, 1, "Number of flows");
 
-//actor shared memory to exchange infomation among actors to compute rewards
-int64_t shm_id = -1;
-void* shm_addr = nullptr;
-//link shared memory to pass link bandwidth to actor
-int64_t shm_id_link = -1;
-void* shm_addr_link = nullptr;
-void sighandler(int sig){
-  std::cerr << "receive SIGTERM signal, exit. ";
-  std::cerr << "release shared memory. " << "shm_id: " << shm_id << ", shm_addr: " << shm_addr << std::endl;
-  shmdt(shm_addr);
-  shmctl(shm_id, IPC_RMID, 0);
-  shmdt(shm_addr_link);
-  shmctl(shm_id_link, IPC_RMID, 0);
-  exit(1);
-}
-
 using namespace quic::traffic_gen;
 using Config = quic::CongestionControlEnv::Config;
 
@@ -110,7 +94,6 @@ makeRLCongestionControllerFactory() {
   cfg.actorId = FLAGS_cc_env_actor_id;
   cfg.episode_id = FLAGS_cc_env_episode_id;
   cfg.flowId = FLAGS_cc_env_flow_id;
-  std::signal(SIGTERM, sighandler);
   if (FLAGS_cc_env_agg == "time") {
     cfg.aggregation = Config::Aggregation::TIME_WINDOW;
   } else if (FLAGS_cc_env_agg == "fixed") {
@@ -140,8 +123,7 @@ makeRLCongestionControllerFactory() {
   cfg.flows = FLAGS_cc_env_flows;
 
   auto envFactory = std::make_shared<quic::CongestionControlEnvFactory>(cfg);
-  return std::make_shared<quic::RLCongestionControllerFactory>(
-    envFactory, &shm_id, &shm_addr, &shm_id_link, &shm_addr_link);
+  return std::make_shared<quic::RLCongestionControllerFactory>(envFactory);
 }
 
 int main(int argc, char* argv[]) {

@@ -112,7 +112,10 @@ function setup_pantheon_dependencies() {
     # We only use schemes enabled in `pantheon_env.get_test_schemes()` by default,
     # and skip the `mvfst_*` schemes since everything should be setup already after
     # this script is done.
-    CC_SCHEMES= "cubic vegas bbr" #ledbat pcc verus sprout quic scream webrtc copa taova vivace pcc_experimental fillp indigo fillp_sheep"
+    cd "$PANTHEON_DIR"
+    #CC_SCHEMES= "cubic vegas bbr ledbat" #ledbat pcc verus sprout quic scream webrtc copa taova vivace pcc_experimental fillp indigo fillp_sheep"
+    CC_SCHEMES= "copa ledbat sprout indigo vivace"
+    # pcc verus  quic scream webrtc  taova  pcc_experimental fillp  fillp_sheep"
     sudo apt-get install kmod
     cd "$PANTHEON_DIR"
     python2 ./src/experiments/setup.py --install-deps --schemes "${CC_SCHEMES}"
@@ -256,7 +259,8 @@ function setup_mahimahi_tunnel() {
 }
 
 if [ "$MAHI_TUNNEL" = true ]; then
-  setup_mahimahi_tunnel
+  #setup_mahimahi_tunnel
+  setup_pantheon_dependencies
 else
   git submodule sync && proxychains git submodule update --init --recursive --progress
   if [ "$INFERENCE" = false ]; then

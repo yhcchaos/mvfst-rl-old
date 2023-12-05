@@ -19,7 +19,6 @@
 
 #include "CongestionControlEnvConfig.h"
 #include "NetworkState.h"
-#include <sys/shm.h>
 #include <sys/types.h>
 #include <string>
 
@@ -145,27 +144,7 @@ class CongestionControlEnv {
   std::chrono::time_point<std::chrono::steady_clock> lastObservationTime_;
   std::chrono::time_point<std::chrono::steady_clock> lastActionTime_;
 
-  key_t shm_key_actor{-1};
-  int64_t shm_id_actor{-1};
-  float* shm_addr_actor{nullptr};
-  key_t shm_key_link{-1};
-  int64_t shm_id_link{-1};
-  uint64_t times = 0;
-  float* shm_addr_link{nullptr};
- public:
-  int64_t getShmIdActor(){
-    return shm_id_actor;
-  }
-  void* getShmAddrActor(){
-    return shm_addr_actor;
-  }
-  int64_t getShmIdLink(){
-    return shm_id_link;
-  }
-  void* getShmAddrLink(){
-    return shm_addr_link;
-  }
-  
+  int64_t times{0};
 };
 
 std::ostream& operator<<(std::ostream& os,
