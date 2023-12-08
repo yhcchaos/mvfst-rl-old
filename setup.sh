@@ -259,8 +259,8 @@ function setup_mahimahi_tunnel() {
 }
 
 if [ "$MAHI_TUNNEL" = true ]; then
-  #setup_mahimahi_tunnel
-  setup_pantheon_dependencies
+  setup_mahimahi_tunnel
+  #setup_pantheon_dependencies
 else
   git submodule sync && proxychains git submodule update --init --recursive --progress
   if [ "$INFERENCE" = false ]; then
