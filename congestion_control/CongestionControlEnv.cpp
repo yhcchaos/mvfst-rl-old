@@ -66,9 +66,9 @@ CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
   lastTdp_ = 10 * conn_.udpSendPacketLen;
   std::signal(SIGTERM, sighandler);
   std::signal(SIGKILL, sighandler);
-  shm_id_actor = shmget((cfg_.actorId << 16) | cfg_.episode_id, sizeof(float) * cfg_.flows, IPC_CREAT | 0666);
+  shm_id_actor = shmget((cfg_.actorId << 24) | cfg_.episode_id, sizeof(float) * cfg_.flows, IPC_CREAT | 0666);
   shm_addr_actor = (float*)shmat(shm_id_actor, 0, 0);
-  shm_id_link = shmget((cfg_.actorId << 20) | cfg_.episode_id, 2*sizeof(float), IPC_CREAT | 0666);
+  shm_id_link = shmget((cfg_.actorId << 28) | cfg_.episode_id, 2*sizeof(float), IPC_CREAT | 0666);
   shm_addr_link = (float*)shmat(shm_id_link, 0, 0);
 
   if(shm_id_actor == -1 || shm_addr_actor == nullptr || shm_id_link == -1 || shm_addr_actor == nullptr){

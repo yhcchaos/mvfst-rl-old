@@ -21,7 +21,7 @@ import numpy as np
 import itertools as it
 import json
 import train.merge_test_results_module as mtrm
-
+import sysv_ipc
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
 
@@ -235,8 +235,8 @@ def train_run(flags, jobs, thread_id):
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
                 param_dict[param] = random.sample(value, 1)[0]
-        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        param_dict["queue"] = int(param_dict["queue"] * bdp)
+        #bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        #param_dict["queue"] = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
         cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
@@ -248,6 +248,27 @@ def train_run(flags, jobs, thread_id):
         )
         p = subprocess.Popen(cmd, env=pantheon_env)
         p.wait()
+        try:
+            shm_key_actor = (thread_id << 24) | episode
+            shm_actor = sysv_ipc.SharedMemory(key=shm_key_actor)
+            shm_actor_clean_cmd = ["ipcrm", "-m", "{}".format(shm_actor.id)]
+            p = subprocess.Popen(shm_actor_clean_cmd)
+            p.wait()
+        except sysv_ipc.ExistentialError:
+            pass
+        
+        try:
+            shm_key_link = (thread_id << 28) | episode
+            shm_link = sysv_ipc.SharedMemory(key=shm_key_link)
+            shm_link_clean_cmd = ["ipcrm", "-m", "{}".format(shm_link.id)]
+            p = subprocess.Popen(shm_link_clean_cmd)
+            p.wait()
+        except sysv_ipc.ExistentialError:
+            pass
+        shutil.copyfile(
+            path.join(data_dir, "pantheon_summary_mean.pdf"),
+            path.join(flags.logdir, "test_expt{}.pdf".format(job_id)),
+        )
         episode += 1
         
         # Remove pantheon logs to free up space
@@ -259,7 +280,8 @@ def test_run(flags, meta, jobs, thread_id):
     """
     Thread i runs jobs[i % len(jobs)] flags.test_runs_per_job times.
     """
-    job_id = thread_id % len(jobs)
+    job_id = thread_id
+    thread_id = (thread_id+1) % flags.num_actors
     job_cfg, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
@@ -274,7 +296,6 @@ def test_run(flags, meta, jobs, thread_id):
     cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
     cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg)
-
     # Run tests
     logging.info(
         "Test run: thread {} -> job {}, cmd: {}".format(
@@ -294,7 +315,24 @@ def test_run(flags, meta, jobs, thread_id):
     )
     p = subprocess.Popen(analysis_cmd, env=pantheon_env)
     p.wait()
-
+    
+    try:
+        shm_key_actor = (thread_id << 24) | episode
+        shm_actor = sysv_ipc.SharedMemory(key=shm_key_actor)
+        shm_actor_clean_cmd = ["ipcrm", "-m", "{}".format(shm_actor.id)]
+        p = subprocess.Popen(shm_actor_clean_cmd)
+        p.wait()
+    except sysv_ipc.ExistentialError:
+        pass
+    
+    try:
+        shm_key_link = (thread_id << 28) | episode
+        shm_link = sysv_ipc.SharedMemory(key=shm_key_link)
+        shm_link_clean_cmd = ["ipcrm", "-m", "{}".format(shm_link.id)]
+        p = subprocess.Popen(shm_link_clean_cmd)
+        p.wait()
+    except sysv_ipc.ExistentialError:
+        pass
     shutil.copyfile(
         path.join(data_dir, "pantheon_summary_mean.pdf"),
         path.join(flags.logdir, "test_expt{}.pdf".format(job_id)),
@@ -314,7 +352,7 @@ def run_pantheon_train(flags, jobs, num_threads, run_fn):
     )
 
     threads = []
-    for i in range(num_threads):
+    for i in range(1, num_threads+1):
         thread = threading.Thread(target=run_fn, args=(flags, jobs, i))
         thread.start()
         threads.append(thread)
@@ -422,7 +460,7 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
                 "--cc_env_rpc_address={}".format(flags.server_address),
                 "--cc_env_model_file={}".format(flags.traced_model),
                 "--cc_env_episode_id={}".format(episode_id),
-                "--cc_env_actor_id={}".format(actor_id+1),
+                "--cc_env_actor_id={}".format(actor_id),
                 "--cc_env_agg={}".format(flags.cc_env_agg),
                 "--cc_env_time_window_ms={}".format(flags.cc_env_time_window_ms),
                 "--cc_env_fixed_window_size={}".format(flags.cc_env_fixed_window_size),
@@ -452,7 +490,7 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     #将字符串按照 shell 语法进行分割，生成一个 token 列表。  
     # #command_line = 'ls -l -a'; tokens = shlex.split(command_line);['ls', '-l', '-a']
     cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
-            "--actor_id={}".format(actor_id+1), "--episode_id={}".format(episode_id)] + \
+            "--actor_id={}".format(actor_id), "--episode_id={}".format(episode_id)] + \
         (['--extra-sender-args="{}"'.format(extra_sender_args)] if extra_sender_args!=None else []) + \
         (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
         (["--do_log"] if flags.do_log == True else [])
