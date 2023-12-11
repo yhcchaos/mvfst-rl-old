@@ -265,10 +265,7 @@ def train_run(flags, jobs, thread_id):
             p.wait()
         except sysv_ipc.ExistentialError:
             pass
-        shutil.copyfile(
-            path.join(data_dir, "pantheon_summary_mean.pdf"),
-            path.join(flags.logdir, "test_expt{}.pdf".format(job_id)),
-        )
+        
         episode += 1
         
         # Remove pantheon logs to free up space
