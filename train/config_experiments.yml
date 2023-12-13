@@ -21,20 +21,36 @@ emu:
     common_param_set: >-
       local --data-dir {data_dir} --pkill-cleanup
   jobs:
-    ##########################################################################################
+    ##########################################################################################, 24, 48, 96, 192, 384
     - scenario: 0
       desc: >-
         A training scenario
       params:
-        flows: [1, 3, 3]
-        bandwidth: [12, 156, 5]
-        queue: [1, 10, 4]
-        loss_ratio: [0.01, 1, 4]
-        delay: [5, 85, 5]
+        flows: {{1,2,3}}
+        bandwidth: {{12,24,48,96,192,384}}
+        queue: {{1,4,7,10}}
+        loss_ratio: {{0.005, 0.01, 0.02, 0.04, 0.08, 0.16}}
+        delay: {{5, 25, 45, 65, 85}}
       command: >-
         {test_path} {common_param_set} --runtime 30 -f {flows}
-        --uplink-trace {traces_dir}/{bandwidth}mbps.trace
-        --downlink-trace {traces_dir}/{bandwidth}mbps.trace
+        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
+        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
+        --prepend-mm-cmds "mm-delay {delay}"
+        --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
+        --append-mm-cmds "mm-loss uplink {loss_ratio}"
+    - scenario: 0
+      desc: >-
+        A training scenario
+      params:
+        flows: [1,2,3]
+        bandwidth: [12,24,48,96,192,384]
+        queue: [1,4,7,10]
+        loss_ratio: [0.005, 0.01, 0.02, 0.04, 0.08, 0.16]
+        delay: [5, 25, 45, 65, 85]
+      command: >-
+        {test_path} {common_param_set} --runtime 30 -f {flows}
+        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
+        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
         --prepend-mm-cmds "mm-delay {delay}"
         --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
         --append-mm-cmds "mm-loss uplink {loss_ratio}"

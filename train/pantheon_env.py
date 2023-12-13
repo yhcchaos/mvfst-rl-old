@@ -235,8 +235,8 @@ def train_run(flags, jobs, thread_id):
                 param_dict[param] = random.sample(value.keys(), 1)[0]
             elif type(value) is list:
                 param_dict[param] = random.sample(value, 1)[0]
-        #bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        #param_dict["queue"] = int(param_dict["queue"] * bdp)
+        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        param_dict["queue"] = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
         cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
@@ -251,6 +251,7 @@ def train_run(flags, jobs, thread_id):
         try:
             shm_key_actor = (thread_id << 24) | episode
             shm_actor = sysv_ipc.SharedMemory(key=shm_key_actor)
+            shm_actor.detach()
             shm_actor_clean_cmd = ["ipcrm", "-m", "{}".format(shm_actor.id)]
             p = subprocess.Popen(shm_actor_clean_cmd)
             p.wait()
@@ -260,6 +261,7 @@ def train_run(flags, jobs, thread_id):
         try:
             shm_key_link = (thread_id << 28) | episode
             shm_link = sysv_ipc.SharedMemory(key=shm_key_link)
+            shm_link.detach()
             shm_link_clean_cmd = ["ipcrm", "-m", "{}".format(shm_link.id)]
             p = subprocess.Popen(shm_link_clean_cmd)
             p.wait()
@@ -316,6 +318,7 @@ def test_run(flags, meta, jobs, thread_id):
     try:
         shm_key_actor = (thread_id << 24) | episode
         shm_actor = sysv_ipc.SharedMemory(key=shm_key_actor)
+        shm_actor.detach()
         shm_actor_clean_cmd = ["ipcrm", "-m", "{}".format(shm_actor.id)]
         p = subprocess.Popen(shm_actor_clean_cmd)
         p.wait()
@@ -325,6 +328,7 @@ def test_run(flags, meta, jobs, thread_id):
     try:
         shm_key_link = (thread_id << 28) | episode
         shm_link = sysv_ipc.SharedMemory(key=shm_key_link)
+        shm_link.detach()
         shm_link_clean_cmd = ["ipcrm", "-m", "{}".format(shm_link.id)]
         p = subprocess.Popen(shm_link_clean_cmd)
         p.wait()
