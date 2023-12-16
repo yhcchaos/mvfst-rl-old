@@ -280,7 +280,7 @@ def test_run(flags, meta, jobs, thread_id):
     Thread i runs jobs[i % len(jobs)] flags.test_runs_per_job times.
     """
     job_id = thread_id
-    thread_id = thread_id % flags.num_actors + 1
+    thread_id = (thread_id+1) % flags.num_actors
     job_cfg, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
@@ -490,8 +490,7 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
                 ]) 
     #将字符串按照 shell 语法进行分割，生成一个 token 列表。  
     # #command_line = 'ls -l -a'; tokens = shlex.split(command_line);['ls', '-l', '-a']
-    cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
-            "--actor_id={}".format(actor_id), "--episode_id={}".format(episode_id)] + \
+    cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times)] + \
         (['--extra-sender-args="{}"'.format(extra_sender_args)] if extra_sender_args!=None else []) + \
         (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
         (["--do_log"] if flags.do_log == True else [])
