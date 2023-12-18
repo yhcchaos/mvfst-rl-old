@@ -37,8 +37,8 @@ def merge_test_results(cc_scheme, base_folder, num_columns, fig_col, fig_row, dp
         ax_row = row % 40 // num_columns
         ax_col = row % num_columns
         for run_id in range(3):
-            throughput_images_path.append(os.path.join(subfolder_path, '{}_datalink_throughput_run{}.png'.format(cc_scheme, run_id+1)))
-            delay_images_path.append(os.path.join(subfolder_path, '{}_datalink_delay_run{}.png'.format(cc_scheme, run_id+1)))
+            throughput_images_path.append(os.path.join(subfolder_path, cc_scheme, '{}_datalink_throughput_run{}.png'.format(cc_scheme, run_id+1)))
+            delay_images_path.append(os.path.join(subfolder_path, cc_scheme, '{}_datalink_delay_run{}.png'.format(cc_scheme, run_id+1)))
         for throughput_path, delay_path in zip(throughput_images_path, delay_images_path):
             if os.path.exists(throughput_path):
                 thrroughput_images.append(plt.imread(throughput_path))

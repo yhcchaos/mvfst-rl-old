@@ -388,11 +388,10 @@ def learn(
         optimizer.step()
         scheduler.step()
         actor_model.load_state_dict(model.state_dict())
-        episode_returns = env_outputs.episode_return[env_outputs.done]
+        episode_returns = env_outputs.episode_return
         stats["step"] = stats.get("step", 0) + flags.unroll_length * flags.batch_size
-        stats["episode_returns"] = tuple(episode_returns.cpu().numpy())
-        stats["mean_episode_return"] = torch.mean(episode_returns).item()
-        stats["mean_episode_step"] = torch.mean(env_outputs.episode_step.float()).item()
+        stats["last_episode_return"] = episode_returns[-1].item()
+        stats["last_episode_step"] = env_outputs.episode_step[-1].item()
         stats["total_loss"] = total_loss.item()
         stats["pg_loss"] = pg_loss.item()
         stats["baseline_loss"] = baseline_loss.item()

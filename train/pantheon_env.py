@@ -280,7 +280,7 @@ def test_run(flags, meta, jobs, thread_id):
     Thread i runs jobs[i % len(jobs)] flags.test_runs_per_job times.
     """
     job_id = thread_id
-    thread_id = (thread_id+1) % flags.num_actors
+    thread_id = thread_id % flags.num_actors + 1
     job_cfg, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
@@ -334,10 +334,12 @@ def test_run(flags, meta, jobs, thread_id):
         p.wait()
     except sysv_ipc.ExistentialError:
         pass
+    '''
     shutil.copyfile(
-        path.join(data_dir, "pantheon_summary_mean.pdf"),
-        path.join(flags.logdir, "test_expt{}.pdf".format(job_id)),
+        path.join(data_dir, "pantheon_summary_mean.png"),
+        path.join(flags.logdir, "test_expt{}.png".format(job_id)),
     )
+    '''
     logging.info(
         "Test run finished for thread {}, job {}, Results in {}.".format(
             thread_id, job_id, data_dir
