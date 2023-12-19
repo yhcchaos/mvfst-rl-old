@@ -153,7 +153,8 @@ class FileWriter:
         if self.first_log_time == None:
             self.first_log_time = now
         time_delta = now - self.first_log_time
-        to_log["_time"] = "{:0>2}:{:0>2}:{:0>2}".format(
+        to_log["_time"] = "{:0>2}-{:0>2}:{:0>2}:{:0>2}".format(
+            time_delta.days,
             time_delta.seconds // 3600,
             (time_delta.seconds % 3600) // 60, 
             time_delta.seconds % 60
