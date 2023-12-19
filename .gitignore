@@ -10,6 +10,7 @@ checkpoint.tar*
 traced_model*
 train/experiments*
 core.*
+run.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
