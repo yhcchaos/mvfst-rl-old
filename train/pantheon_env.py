@@ -224,23 +224,17 @@ def train_run(flags, jobs, thread_id):
         # Pick a random experiment to run
         job_id = random.choice(range(len(jobs)))
         job_cfg, cmd_tmpl = jobs[job_id]
+        params = job_cfg["params"].copy()
+        schemes = job_cfg['schemes'].copy()
         # Expand data_dir in cmd template
         data_dir = path.join(
             flags.logdir, "train_tid{}_run{}_expt{}".format(thread_id, episode, job_id)
         )
-        param_dict = job_cfg["params"].copy()
-        for param in param_dict:
-            value = param_dict[param]
-            if type(value) is dict:
-                param_dict[param] = random.sample(value.keys(), 1)[0]
-            elif type(value) is list:
-                param_dict[param] = random.sample(value, 1)[0]
-        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        param_dict["queue"] = int(param_dict["queue"] * bdp)
-        cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
+        bdp = params["bandwidth"]  * params["delay"] * 2 / 12
+        params["queue"] = int(params["queue"] * bdp)
+        cmd_tmpl = utils.safe_format(cmd_tmpl, params)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-        cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
-
+        cmd = update_cmd(cmd, flags, thread_id, episode, params, schemes)
         logging.info(
             "Thread: {}, episode: {}, experiment: {}, cmd: {}".format(
                 thread_id, episode, job_id, " ".join(cmd)
@@ -284,17 +278,20 @@ def test_run(flags, meta, jobs, thread_id):
     job_cfg, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
+    params = job_cfg["params"].copy()
+    schemes = job_cfg['schemes'].copy()
     data_dir = path.join(flags.logdir, "f{},b{:03d},q{:02d},l{},d{:02d}"
-                         .format(job_cfg["params"]["flows"], 
-                                 job_cfg["params"]["bandwidth"], 
-                                 job_cfg["params"]["queue"], 
-                                 job_cfg["params"]["loss_ratio"], 
-                                 job_cfg["params"]["delay"]))
-    bdp = job_cfg["params"]["bandwidth"] * 1000 * job_cfg["params"]["delay"] * 2 / 8 / 1500
-    job_cfg["params"]["queue"] = int(job_cfg["params"]["queue"] * bdp)
-    cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
+                         .format(params["flows"], 
+                                 params["bandwidth"], 
+                                 params["queue"], 
+                                 params["loss_ratio"], 
+                                 params["delay"]))
+    
+    bdp = params["bandwidth"] * 1000 * params["delay"] * 2 / 8 / 1500
+    params["queue"] = int(params["queue"] * bdp)
+    cmd_tmpl = utils.safe_format(cmd_tmpl, params)
     cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-    cmd = update_cmd(cmd, flags, thread_id, episode, job_cfg)
+    cmd = update_cmd(cmd, flags, thread_id, episode, params, schemes)
     # Run tests
     logging.info(
         "Test run: thread {} -> job {}, cmd: {}".format(
@@ -404,26 +401,21 @@ def get_pantheon_emulated_jobs(flags):
         # 2. Expand meta
         cmd_tmpl = utils.safe_format(cmd_tmpl, cfg["meta"])
         # 3. Expand parameter combinations for testing
-        if flags.mode == "train":
-            jobs.append((job_cfg, cmd_tmpl))
-            with open(os.path.join(flags.logdir, 'train_env_params.json'), 'w') as f:
-                json.dump(job_cfg['params'], f)
-        else:
-            param_keys = job_cfg["params"].keys()
-            for param in param_keys:
-                value = job_cfg["params"][param]
-                if type(value) is dict:
-                    job_cfg["params"][param] = list(value.keys())
-            with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
-                json.dump(job_cfg['params'], f)
-            param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
-                                       else [job_cfg["params"][param]]
-                                       for param in job_cfg["params"]))
-            for param_values in param_combs:
-                param_dict = dict(zip(param_keys, param_values))
-                job_cfg_cpy = job_cfg.copy()
-                job_cfg_cpy["params"] = param_dict
-                jobs.append((job_cfg_cpy, cmd_tmpl))
+        param_keys = job_cfg["params"].keys()
+        for param in param_keys:
+            value = job_cfg["params"][param]
+            if type(value) is dict:
+                job_cfg["params"][param] = list(value.keys())
+        with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
+            json.dump(job_cfg['params'], f)
+        param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
+                                    else [job_cfg["params"][param]]
+                                    for param in job_cfg["params"]))
+        for param_values in param_combs:
+            param_dict = dict(zip(param_keys, param_values))
+            job_cfg_cpy = job_cfg.copy()
+            job_cfg_cpy["params"] = param_dict
+            jobs.append((job_cfg_cpy, cmd_tmpl))
     return cfg["meta"], jobs
 
 
@@ -440,18 +432,13 @@ def get_pantheon_env(flags):
     return pantheon_env
 
 
-def update_cmd(cmd, flags, actor_id, episode_id, params=None):
+def update_cmd(cmd, flags, actor_id, episode_id, params, schemes):
     # in train mode, params = cfg["emu"]["jobs"]["params"]
+    schemes = " ".join(schemes)
     if flags.mode == "train":
-        schemes = "mvfst_rl"
         run_times = 1
     # in test mode, params = cfg["emu"]["jobs"]
     else:
-        if flags.test_other:
-            schemes = " ".join(params["schemes"])
-        else:
-            schemes = "mvfst_rl"
-        params = params["params"]
         run_times = flags.test_runs_per_job
     extra_sender_args = None
     if not flags.test_other:
@@ -481,13 +468,12 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
                 "-v={}".format(flags.loglevel),
             ]
         )
-        if params:
-            extra_sender_args += " " + " ".join([
-                "--cc_env_bandwidth={}".format(params['bandwidth']),
-                "--cc_env_delay={}".format(params['delay']),
-                "--cc_env_loss_ratio={}".format(params['loss_ratio']),
-                "--cc_env_flows={}".format(params['flows']),
-                ]) 
+        extra_sender_args += " " + " ".join([
+            "--cc_env_bandwidth={}".format(params['bandwidth']),
+            "--cc_env_delay={}".format(params['delay']),
+            "--cc_env_loss_ratio={}".format(params['loss_ratio']),
+            "--cc_env_flows={}".format(params['flows']),
+            ]) 
     #将字符串按照 shell 语法进行分割，生成一个 token 列表。  
     # #command_line = 'ls -l -a'; tokens = shlex.split(command_line);['ls', '-l', '-a']
     cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
