@@ -1,13 +1,16 @@
 import os
-with open(os.path.join("stage", "24mbps.trace"), 'w') as f:
-    bandwidth = [12, 36]
-    start_time = 1
-    for j in range (2):
-        for bw in bandwidth:
-            send_packets = bw // 12
-            f.write("#"+str(bw)+"\n")
-            for i in range(30*1000):
-                time = start_time + i
-                for j in range(send_packets):
-                    f.write(str(time)+"\n")
-            start_time = start_time + 30*1000        
+import sys
+bw = int(sys.argv[1])
+next_bw = int(sys.argv[2])
+time_change = int(sys.argv[3])
+with open(os.path.join("stage", str(bw)+'-'+str(next_bw)+'-'+str(time_change)+'mbps.trace'), 'w') as f:
+    f.write("#"+str(1)+" "+str(bw)+"\n")
+    f.write("#"+str(time_change*1000)+" "+str(next_bw)+"\n")
+    for i in range(1, time_change*1000):
+        send_pkts = bw // 12
+        for j in range(send_pkts) :
+            f.write(str(i)+'\n')
+    for i in range(time_change*1000, 40000):
+        send_pkts = next_bw // 12
+        for j in range(send_pkts):
+            f.write(str(i)+'\n')
