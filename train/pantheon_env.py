@@ -24,7 +24,7 @@ import train.merge_test_results_module as mtrm
 import sysv_ipc
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
-
+import copy
 logging.basicConfig(level=logging.INFO)
 
 
@@ -223,22 +223,16 @@ def train_run(flags, jobs, thread_id):
     while True:
         # Pick a random experiment to run
         job_id = random.choice(range(len(jobs)))
-        job_cfg, cmd_tmpl = jobs[job_id]
+        param_dict, cmd_tmpl = jobs[job_id]
         # Expand data_dir in cmd template
         data_dir = path.join(
             flags.logdir, "train_tid{}_run{}_expt{}".format(thread_id, episode, job_id)
         )
-        param_dict = job_cfg["params"].copy()
-        for param in param_dict:
-            value = param_dict[param]
-            if type(value) is dict:
-                param_dict[param] = random.sample(value.keys(), 1)[0]
-            elif type(value) is list:
-                param_dict[param] = random.sample(value, 1)[0]
         bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
-        param_dict["queue"] = int(param_dict["queue"] * bdp)
+        queueBDP = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
+        cmd = utils.safe_format(cmd_tmpl, {"queueBDP": queueBDP})
         cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
 
         logging.info(
@@ -406,26 +400,17 @@ def get_pantheon_emulated_jobs(flags):
         # 2. Expand meta
         cmd_tmpl = utils.safe_format(cmd_tmpl, cfg["meta"])
         # 3. Expand parameter combinations for testing
-        if flags.mode == "train":
-            jobs.append((job_cfg, cmd_tmpl))
-            with open(os.path.join(flags.logdir, 'train_env_params.json'), 'w') as f:
-                json.dump(job_cfg['params'], f)
-        else:
-            param_keys = job_cfg["params"].keys()
-            for param in param_keys:
-                value = job_cfg["params"][param]
-                if type(value) is dict:
-                    job_cfg["params"][param] = list(value.keys())
-            with open(os.path.join(flags.logdir, 'test_env_params.json'), 'w') as f:
-                json.dump(job_cfg['params'], f)
-            param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
-                                       else [job_cfg["params"][param]]
-                                       for param in job_cfg["params"]))
-            for param_values in param_combs:
-                param_dict = dict(zip(param_keys, param_values))
-                job_cfg_cpy = job_cfg.copy()
-                job_cfg_cpy["params"] = param_dict
-                jobs.append((job_cfg_cpy, cmd_tmpl))
+        param_keys = job_cfg["params"].keys()
+        for param in param_keys:
+            value = job_cfg["params"][param]
+            if type(value) is dict:
+                job_cfg["params"][param] = list(value.keys())
+        param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
+                                    else [job_cfg["params"][param]]
+                                    for param in job_cfg["params"]))
+        for param_values in param_combs:
+            param_dict = dict(zip(param_keys, param_values))
+            jobs.append((param_dict, cmd_tmpl))
     return cfg["meta"], jobs
 
 
