@@ -1,0 +1,22 @@
+{
+    "actor_id": 2,
+    "append_mm_cmds": "mm-loss uplink 0",
+    "cc_schemes": [
+        "mvfst_rl"
+    ],
+    "do_log": false,
+    "downlink_trace": "96mbps.trace",
+    "episode_id": 1,
+    "extra_mm_link_args": "--uplink-queue=droptail --uplink-queue-args=packets=1",
+    "extra_sender_args": "\"--cc_env_mode=remote --cc_env_rpc_address=unix:/tmp/rl_server_path --cc_env_model_file=logs/e12m3_1231_1-0.02*DeltaDivSumDelta*f-2_steps7000wan_f1-3-3_b12-192-exp5+var_q0.5-16-exp6bdp_l0-0.05-exp5_d5-80-6_rt30_a10_hidden256/traced_model.pt --cc_env_episode_id=1 --cc_env_actor_id=2 --cc_env_agg=time --cc_env_time_window_ms=100 --cc_env_fixed_window_size=10 --cc_env_use_state_summary=True --cc_env_history_size=20 --cc_env_norm_ms=100.0 --cc_env_norm_bytes=1000.0 --cc_env_actions=0,/2,/1.5,/1.2,/1.1,/1.05,*1.05,*1.1,*1.2,*1.5,*2 --cc_env_reward_throughput_factor=1.0 --cc_env_reward_delay_factor=0.02 --cc_env_reward_packet_loss_factor=2.0 --cc_env_reward_max_delay=True -v=1 --cc_env_bandwidth=1 --cc_env_delay=5 --cc_env_loss_ratio=0 --cc_env_flows=3\"",
+    "flows": 3,
+    "git_summary": "branch: dev @ b1cacd5e594289ef0fb4c660227e56cc1581ab7d\nthird_party/fillp @ 9c3626d9af3d5af070146f6317c3e5a0274b99b8\nthird_party/fillp-sheep @ d00f58505c6168bbfa7f26d1d679f9dc25f72015\nthird_party/genericCC @ 18299d6e439a630e1f2928f3f7bef82d56695bdf\nthird_party/indigo @ 463d89b09699a57bfdfbae351646df6a60040b90\nthird_party/libutp @ 2b364cbb0650bdab64a5de2abb4518f9f228ec44\nthird_party/pantheon_tunnel @ b95cc8aea313dc60c58ee6bbe2c2406d6adaf78b\nthird_party/pcc @ 1afc958fa0d66d18b623c091a55fec872b4981e1\nthird_party/pcc-experimental @ cd43e34e3f5f5613e8acd08fab92c4eb24f974ab\nthird_party/proto-quic @ 77961f1a82733a86b42f1bc8143ebc978f3cff42\nthird_party/scream-reproduce @ f099118d1421aa3131bf11ff1964974e1da3bdb2\nthird_party/sprout @ 366e35c6178b01e31d4a46ad18c74f9415f19a26\nthird_party/verus @ d4b447ea74c6c60a261149af2629562939f9a494\nthird_party/vivace @ 2baf86211435ae071a32f96b7d8c504587f5d7f4\nthird_party/webrtc @ 3f0cc2a9061a41b6f9dde4735770d143a1fa2851\n",
+    "interval": 0,
+    "mode": "local",
+    "prepend_mm_cmds": "mm-delay 5",
+    "random_order": false,
+    "run_times": 1,
+    "runtime": 30,
+    "start_run_id": 1,
+    "uplink_trace": "96mbps.trace"
+}

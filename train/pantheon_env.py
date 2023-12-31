@@ -228,7 +228,10 @@ def train_run(flags, jobs, thread_id):
         data_dir = path.join(
             flags.logdir, "train_tid{}_run{}_expt{}".format(thread_id, episode, job_id)
         )
-        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        if type(param_dict["bandwidth"]) == str:
+            bdp = int(param_dict["bandwidth"].split('-')[0]) * 1000 * param_dict["delay"] * 2 / 8 / 1500
+        else:
+            bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
         queueBDP = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
         cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
@@ -470,7 +473,7 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
         )
         if params:
             extra_sender_args += " " + " ".join([
-                "--cc_env_bandwidth={}".format(params['bandwidth']),
+                "--cc_env_bandwidth={}".format(1),
                 "--cc_env_delay={}".format(params['delay']),
                 "--cc_env_loss_ratio={}".format(params['loss_ratio']),
                 "--cc_env_flows={}".format(params['flows']),

@@ -54,7 +54,7 @@ def add_args(parser):
         help="Length of the observation vector to be fed into the model.",
     )
     parser.add_argument(
-        "--hidden_size", type=int, default=512, help="Hidden size in FC model."
+        "--hidden_size", type=int, default=256, help="Hidden size in FC model."
     )
     parser.add_argument(
         "--num_actions",
