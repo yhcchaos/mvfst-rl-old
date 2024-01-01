@@ -19,7 +19,7 @@ import getpass
 import shutil
 from distutils.dir_util import copy_tree
 import sys
-
+import time
 from train import polybeast, pantheon_env, common, utils
 from train.constants import THIRD_PARTY_ROOT
 
@@ -90,7 +90,7 @@ def run_remote(flags, train=True):
     flags.address = "unix:{}".format(address)
     flags.server_address = flags.address
         # Round-robin device assignment
-    device = "cuda:0" if cuda else "cpu" #可以添加一个参数指定cuda
+    device = "cuda:7" if cuda else "cpu" #可以添加一个参数指定cuda
     logging.info(
         "Starting agent on device {}. Mode={}, logdir={}".format(
             device, flags.mode, flags.logdir
@@ -107,6 +107,7 @@ def run_remote(flags, train=True):
         daemon=False
     )
     polybeast_proc.start()
+    time.sleep(60)
     pantheon_proc.start()
 
     if train:

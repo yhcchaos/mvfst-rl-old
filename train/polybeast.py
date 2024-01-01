@@ -407,7 +407,7 @@ def learn(
         lock.release()
 
 
-def train(flags, device="cuda:0"):
+def train(flags, device="cuda:7"):
     if flags.xpid is None:
         flags.xpid = "torchbeast-%s" % time.strftime("%Y%m%d-%H%M%S")
     plogger = file_writer.FileWriter(
@@ -651,7 +651,7 @@ def trace_model(flags, model):
 def test(flags, **kwargs):
     if not flags.disable_cuda and torch.cuda.is_available():
         logging.info("Using CUDA for testing.")
-        flags.actor_device = torch.device("cuda:0")
+        flags.actor_device = torch.device("cuda:7")
     else:
         logging.info("Not using CUDA for testing.")
         flags.actor_device = torch.device("cpu")
@@ -726,7 +726,7 @@ def test(flags, **kwargs):
         t.join()
 
 
-def main(flags, device="cuda:0"):
+def main(flags, device="cuda:7"):
     torch.random.manual_seed(flags.seed)
 
     # We disable batching in learner as unroll lengths could different across

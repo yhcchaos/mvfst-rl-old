@@ -20,7 +20,7 @@ import time
 import numpy as np
 import itertools as it
 import json
-import train.merge_test_results_module as mtrm
+#import train.merge_test_results_module as mtrm
 import sysv_ipc
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
@@ -73,6 +73,11 @@ def add_args(parser):
         help="do we log during the training or test process",
     )
     #--
+    parser.add_argument(
+        "--scheme_config",
+        action = 'store_true', 
+        help="do we user config file to test?",
+    )
     parser.add_argument(
         "--num_actors",
         type=int,
@@ -234,8 +239,7 @@ def train_run(flags, jobs, thread_id):
             bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
         queueBDP = int(param_dict["queue"] * bdp)
         cmd_tmpl = utils.safe_format(cmd_tmpl, param_dict)
-        cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir})
-        cmd = utils.safe_format(cmd_tmpl, {"queueBDP": queueBDP})
+        cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir, "queueBDP": queueBDP})
         cmd = update_cmd(cmd, flags, thread_id, episode, param_dict)
 
         logging.info(
@@ -270,7 +274,6 @@ def train_run(flags, jobs, thread_id):
         # Remove pantheon logs to free up space
         if os.path.exists(data_dir):
             shutil.rmtree(data_dir)
-
 
 def test_run(flags, meta, jobs, thread_id):
     """
@@ -388,7 +391,7 @@ def run_pantheon_test(flags, meta, jobs, num_threads, run_fn):
     logging.info("Done with {}.".format(flags.mode))
     if(flags.merge_results):
         logging.info("Merge results...")
-        mtrm.merge_test_results(flags.cc_scheme, flags.logdir, flags.num_columns, flags.fig_col, flags.fig_row, flags.dpi)
+        #mtrm.merge_test_results(flags.cc_scheme, flags.logdir, flags.num_columns, flags.fig_col, flags.fig_row, flags.dpi)
     
 
 
@@ -411,10 +414,19 @@ def get_pantheon_emulated_jobs(flags):
         param_combs = it.product(*(job_cfg["params"][param] if type(job_cfg["params"][param]) is list
                                     else [job_cfg["params"][param]]
                                     for param in job_cfg["params"]))
-        for param_values in param_combs:
-            param_dict = dict(zip(param_keys, param_values))
-            jobs.append((param_dict, cmd_tmpl))
-    return cfg["meta"], jobs
+        if flags.mode == "train":
+            for param_values in param_combs:
+                param_dict = dict(zip(param_keys, param_values))
+                jobs.append((param_dict, cmd_tmpl))
+        else:
+            for param_values in param_combs:
+                param_dict = dict(zip(param_keys, param_values))
+                job_cfg_cpy = job_cfg.copy()
+                job_cfg_cpy["params"] = param_dict
+                jobs.append((job_cfg_cpy, utils.safe_format(cmd_tmpl, param_dict)))
+            for job, _ in jobs:
+                logging.error(job['params'])
+        return cfg["meta"], jobs
 
 
 def get_pantheon_env(flags):
@@ -428,7 +440,6 @@ def get_pantheon_env(flags):
     pantheon_env = os.environ.copy()
     pantheon_env["PATH"] = ":".join([python2_path, pantheon_env["PATH"]])
     return pantheon_env
-
 
 def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     # in train mode, params = cfg["emu"]["jobs"]["params"]
@@ -483,10 +494,9 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
             "--actor_id={}".format(actor_id), "--episode_id={}".format(episode_id)] + \
         (['--extra-sender-args="{}"'.format(extra_sender_args)] if extra_sender_args!=None else []) + \
-        (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
+        (["--schemes={}".format(schemes)] if flags.scheme_config==False else []) + \
         (["--do_log"] if flags.do_log == True else [])
     return cmd
-
 
 def main(flags):
     meta, all_jobs = get_pantheon_emulated_jobs(flags)
