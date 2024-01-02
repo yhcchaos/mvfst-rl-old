@@ -418,6 +418,8 @@ def get_pantheon_emulated_jobs(flags):
             for param_values in param_combs:
                 param_dict = dict(zip(param_keys, param_values))
                 jobs.append((param_dict, cmd_tmpl))
+            for job, _ in jobs:
+                logging.error(job)
         else:
             for param_values in param_combs:
                 param_dict = dict(zip(param_keys, param_values))
@@ -426,7 +428,7 @@ def get_pantheon_emulated_jobs(flags):
                 jobs.append((job_cfg_cpy, utils.safe_format(cmd_tmpl, param_dict)))
             for job, _ in jobs:
                 logging.error(job['params'])
-        return cfg["meta"], jobs
+    return cfg["meta"], jobs
 
 
 def get_pantheon_env(flags):
