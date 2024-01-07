@@ -243,11 +243,15 @@ std::vector<float> CongestionControlEnv::computeReward(
   if(cfg_.flows == 1){
     reg = 1;
   }
+  float lossFactor = cfg_.packetLossFactor;
+  if(goodputMbps<bw_share){
+    lossFactor=0;
+  }
   //VLOG(1) << "reg= " << reg;
   float bw_reward = cfg_.throughputFactor * std::min(goodputMbps / bandwidth * float(cfg_.flows), float(1));
   float delay_reward = avgQDelayMs;
   float delay_reward_all =  cfg_.delayFactor * delay_reward * reg;
-  float loss_reward =  cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / bandwidth * float(cfg_.flows);
+  float loss_reward =  lossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / bandwidth * float(cfg_.flows);
   float reward = bw_reward - delay_reward_all - loss_reward;
   if(times % 100 == 0){
     VLOG(1) << "change time=" << changeTime
