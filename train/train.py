@@ -19,7 +19,7 @@ import getpass
 import shutil
 from distutils.dir_util import copy_tree
 import sys
-
+import time
 from train import polybeast, pantheon_env, common, utils
 from train.constants import THIRD_PARTY_ROOT
 
@@ -107,6 +107,7 @@ def run_remote(flags, train=True):
         daemon=False
     )
     polybeast_proc.start()
+    time.sleep(10)
     pantheon_proc.start()
 
     if train:

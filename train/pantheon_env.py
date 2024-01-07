@@ -495,7 +495,7 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
     cmd =  shlex.split(cmd) + ["--run-times={}".format(run_times), 
             "--actor_id={}".format(actor_id), "--episode_id={}".format(episode_id)] + \
         (['--extra-sender-args="{}"'.format(extra_sender_args)] if extra_sender_args!=None else []) + \
-        (["--schemes={}".format(schemes)] if '--flow-schemes' not in cmd else []) + \
+        (["--schemes={}".format(schemes)] if '--config_file' not in cmd else []) + \
         (["--do_log"] if flags.do_log == True else [])
     return cmd
 
