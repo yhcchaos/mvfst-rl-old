@@ -25,9 +25,9 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from datetime import datetime
-from train import common, utils
+from train import utils
 from train.constants import TORCHBEAST_ROOT
-
+from train import arg_parser
 sys.path.append(TORCHBEAST_ROOT)
 
 from core import file_writer
@@ -36,124 +36,6 @@ from core import vtrace
 import nest
 
 from libtorchbeast import actorpool
-
-
-def add_args(parser):
-    parser.add_argument("--xpid", default=None, help="Experiment id (default: None).")
-
-    # Model output settings.
-    parser.add_argument(
-        "--checkpoint",  help="File to write checkpoints to."
-    )
-
-    # Model settings.
-    parser.add_argument(
-        "--observation_length",
-        type=int,
-        default=48,
-        help="Length of the observation vector to be fed into the model.",
-    )
-    parser.add_argument(
-        "--hidden_size", type=int, default=256, help="Hidden size in FC model."
-    )
-    parser.add_argument(
-        "--num_actions",
-        type=int,
-        default=11,
-        help="Number of actions output by the policy.",
-    )
-
-    # Training settings.
-    parser.add_argument(
-        "--address",
-        default="unix:/tmp/rl_server_path",
-        type=str,
-        help="Address to bind ActorPoolServer to. Could be either "
-        "<host>:<port> or Unix domain socket path unix:<path>.",
-    )
-    parser.add_argument(
-        "--savedir",
-        default="~/palaas/torchbeast",
-        help="Root dir where experiment data will be saved.",
-    )
-    parser.add_argument(
-        "--total_steps",
-        default=1000000,
-        type=int,
-        metavar="T",
-        help="Total environment steps to train for",
-    )
-    parser.add_argument(
-        "--batch_size", default=1, type=int, metavar="B", help="Learner batch size"
-    )
-    parser.add_argument(
-        "--unroll_length",
-        default=80,
-        type=int,
-        metavar="T",
-        help="The unroll length (time dimension)",
-    )
-    parser.add_argument(
-        "--num_learner_threads",
-        default=2,
-        type=int,
-        metavar="N",
-        help="Number of learner threads.",
-    )
-    parser.add_argument(
-        "--num_inference_threads",
-        default=2,
-        type=int,
-        metavar="N",
-        help="Number of inference threads.",
-    )
-    parser.add_argument("--disable_cuda", action="store_true", help="Disable CUDA.")
-    parser.add_argument(
-        "--use_lstm",
-        type=utils.str2bool,
-        default="true",
-        help="Use LSTM in agent model.",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=1234, help="Initial random seed for torch.random"
-    )
-    # Loss settings.
-    parser.add_argument(
-        "--entropy_cost", default=0.05, type=float, help="Entropy cost/multiplier."
-    )
-    parser.add_argument(
-        "--baseline_cost", default=0.5, type=float, help="Baseline cost/multiplier."
-    )
-    parser.add_argument(
-        "--discounting", default=0.99, type=float, help="Discounting factor."
-    )
-    parser.add_argument(
-        "--reward_clipping",
-        default="none",
-        choices=["abs_one", "soft_asymmetric", "none"],
-        help="Reward clipping.",
-    )
-
-    # Optimizer settings.
-    parser.add_argument(
-        "--learning_rate",
-        default=0.001,
-        type=float,
-        metavar="LR",
-        help="Learning rate.",
-    )
-    parser.add_argument(
-        "--alpha", default=0.99, type=float, help="RMSProp smoothing constant."
-    )
-    parser.add_argument("--momentum", default=0, type=float, help="RMSProp momentum.")
-    parser.add_argument("--epsilon", default=1e-5, type=float, help="RMSProp epsilon.")
-
-    # Misc settings.
-    parser.add_argument(
-        "--write_profiler_trace",
-        action="store_true",
-        help="Collect and write a profiler trace " "for chrome://tracing/.",
-    )
 
 
 logging.basicConfig(
@@ -407,7 +289,7 @@ def learn(
         lock.release()
 
 
-def train(flags, device="cuda:7"):
+def train(flags, device="cuda:0"):
     if flags.xpid is None:
         flags.xpid = "torchbeast-%s" % time.strftime("%Y%m%d-%H%M%S")
     plogger = file_writer.FileWriter(
@@ -475,7 +357,7 @@ def train(flags, device="cuda:7"):
         unroll_length=flags.unroll_length,
         learner_queue=learner_queue,
         inference_batcher=inference_batcher,
-        server_address=flags.address,
+        server_address=flags.rpc_server_address,
         initial_agent_state=actor_model.initial_state(),
     )
 
@@ -651,7 +533,7 @@ def trace_model(flags, model):
 def test(flags, **kwargs):
     if not flags.disable_cuda and torch.cuda.is_available():
         logging.info("Using CUDA for testing.")
-        flags.actor_device = torch.device("cuda:7")
+        flags.actor_device = torch.device("cuda:0")
     else:
         logging.info("Not using CUDA for testing.")
         flags.actor_device = torch.device("cpu")
@@ -726,7 +608,7 @@ def test(flags, **kwargs):
         t.join()
 
 
-def main(flags, device="cuda:7"):
+def main(flags, device="cuda:0"):
     torch.random.manual_seed(flags.seed)
 
     # We disable batching in learner as unroll lengths could different across
@@ -758,7 +640,7 @@ def main(flags, device="cuda:7"):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PyTorch Scalable Agent")
-    common.add_args(parser)
-    add_args(parser)
+    arg_parser.add_common_args(parser)
+    arg_parser.add_polybeast_args(parser)
     flags = parser.parse_args()
     main(flags)

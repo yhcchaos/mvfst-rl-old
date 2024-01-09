@@ -241,7 +241,7 @@ function setup_mahimahi_tunnel() {
     conda uninstall -y protobuf=3.12.3
   fi
   ./autogen.sh
-  make clean
+#  make clean
   ./configure
   make
   sudo make install
