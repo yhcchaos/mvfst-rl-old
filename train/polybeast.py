@@ -293,7 +293,7 @@ def train(flags, device="cuda:0"):
     if flags.xpid is None:
         flags.xpid = "torchbeast-%s" % time.strftime("%Y%m%d-%H%M%S")
     plogger = file_writer.FileWriter(
-        xpid=flags.xpid, xp_args=flags.__dict__, rootdir=flags.savedir
+        xpid=flags.xpid, xp_args=flags.__dict__, rootdir=flags.logdir
     )
 
     if not flags.disable_cuda and torch.cuda.is_available():

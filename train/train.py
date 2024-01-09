@@ -87,7 +87,7 @@ def run_remote(flags, mode='train'):
     )
     
     polybeast_proc.start()
-    #time.sleep(10)
+    time.sleep(30)
     pantheon_proc.start()
 
     if mode=='train':
