@@ -47,6 +47,13 @@ def add_pantheon_args(parser):
     )
     #--
     parser.add_argument(
+        "--sample",
+        type=str,
+        default='mean',
+        choices=['mean', 'ave'],
+        help="sample"
+    )
+    parser.add_argument(
         "--num_actors",
         type=int,
         default=0,

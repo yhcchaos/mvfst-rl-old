@@ -573,7 +573,7 @@ def test(flags, **kwargs):
         unroll_length=0,  # Unused in test mode
         learner_queue=None,  # Indicates test mode
         inference_batcher=inference_batcher,
-        server_address=flags.address,
+        server_address=flags.rpc_server_address,
         initial_agent_state=model.initial_state(),
     )
 

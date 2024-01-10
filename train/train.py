@@ -52,7 +52,7 @@ def init_logdirs(flags):
         if(flags.checkpoint == None):
             flags.checkpoint = os.path.join(checkpoint_dir, "checkpoint.tar")
     elif flags.mode == 'test':
-        flags.log_dir = os.path.join(flags.base_logdir, flags.mode, flags.test_name)
+        flags.logdir = os.path.join(flags.base_logdir, flags.mode, flags.test_name)
     
     flags.traced_model = os.path.join(flags.base_logdir, "traced_model.pt")
     os.makedirs(flags.logdir, exist_ok=True)  
@@ -139,7 +139,7 @@ def main(flags):
         run_remote(flags, mode='test')
     elif mode == "test":
         # Only remote test
-        run_remote(flags, mode='train')
+        run_remote(flags, mode='test')
     elif mode == 'test_local':
         test_local(flags)
     elif mode == "trace":

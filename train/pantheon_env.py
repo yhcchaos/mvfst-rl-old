@@ -18,6 +18,8 @@ import yaml
 import shutil
 import threading
 import logging
+import numpy as np
+from fractions import Fraction
 import time
 import itertools as it
 #import train.merge_test_results_module as mtrm
@@ -26,21 +28,29 @@ from train import utils
 
 logging.basicConfig(level=logging.INFO)
 
-def train_run(flags, jobs, actor_id):
-    """
-    Each pantheon job runs for a default of 30s.
-    We treat each such run as a separate episode for training and run
-    randomly chosen job in parallel.
-    """
+def train_run(flags, jobs, probs, actor_id):
+    # prob is only used when flags.sample=='ave' 
     episode = 1
     while True:
-        # Pick a random experiment to run
-        job_id = random.choice(range(len(jobs)))
-        param_dict, cmd_tmpl = jobs[job_id]
+        if flags.sample=='ave':
+            if len(probs) == 0:
+                job_id = np.random.choice(range(len(jobs)))
+            else:
+                job_id = np.random.choice(range(len(jobs)), p=probs)
+            job_cfg, cmd_tmpl = jobs[job_id]
+            param_dict = job_cfg["params"].copy()
+            for param in param_dict:
+                value = param_dict[param]
+                assert(type(value)==list)
+                param_dict[param] = random.sample(value, 1)[0]
+        else:
+            job_id = np.random.choice(range(len(jobs)))
+            param_dict, cmd_tmpl = jobs[job_id]
         # Expand data_dir in cmd template
         data_dir = path.join(
             flags.logdir, "train_tid{}_run{}_expt{}".format(actor_id, episode, job_id)
         )
+        
         cmd = utils.complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode)
         logging.info(
             "actor_id: {}, episode: {}, job_id: {}, cmd: {}".format(
@@ -100,20 +110,25 @@ def main(flags):
             utils.safe_format(cfg.read(), {"src_dir": SRC_DIR, "pantheon_root": PANTHEON_ROOT})
         )
     jobs = []
+    probs = []
     for job_cfg in env_cfg["emu"]["jobs"]:
         cmd_tmpl = job_cfg["command"]
         # 1. Expand macros
         cmd_tmpl = utils.safe_format(cmd_tmpl, env_cfg["emu"]["macros"])
         # 2. Expand meta
         cmd_tmpl = utils.safe_format(cmd_tmpl, env_cfg["meta"])
-        # 3. Expand parameter combinations for testing
-        param_keys = job_cfg["params"].keys()
-        param_combs = it.product(*(job_cfg["params"][param] for param in job_cfg["params"]))
-        for param_values in param_combs:
-            param_dict = dict(zip(param_keys, param_values))
-            logging.info(param_dict)
-            logging.info(cmd_tmpl)
-            jobs.append((param_dict, cmd_tmpl))
+        if flags.mode == "train" and flags.sample=='ave':
+            if 'prob' in job_cfg:
+                probs.append(float(Fraction(job_cfg['prob'])))
+            jobs.append((job_cfg, cmd_tmpl))
+        else:
+            # 3. Expand parameter combinations for testing
+            param_keys = job_cfg["params"].keys()
+            param_combs = it.product(*(job_cfg["params"][param] for param in job_cfg["params"]))
+            for param_values in param_combs:
+                param_dict = dict(zip(param_keys, param_values))
+                jobs.append((param_dict, cmd_tmpl))
+
     if flags.mode == "test" and flags.num_actors > len(jobs):
         flags.num_actors = len(jobs)
     logging.info(
@@ -124,7 +139,7 @@ def main(flags):
     threads = []
     if flags.mode == "train":
         for actor_id in range(1, flags.num_actors +1):
-            thread = threading.Thread(target=train_run, args=(flags, jobs, actor_id))
+            thread = threading.Thread(target=train_run, args=(flags, jobs, probs, actor_id))
             thread.start()
             threads.append(thread)
             # Stagger the beginning of each thread to avoid some errors due to
