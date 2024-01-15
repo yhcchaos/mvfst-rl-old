@@ -11,7 +11,7 @@
 #include <glog/logging.h>
 #include <quic/QuicConstants.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
-
+#include <quic/congestion_control/TokenlessPacer.h>
 #include <memory>
 
 #include "RLCongestionController.h"
@@ -30,11 +30,12 @@ class RLCongestionControllerFactory : public CongestionControllerFactory {
   ~RLCongestionControllerFactory() override = default;
 
   std::unique_ptr<CongestionController> makeCongestionController(
-      QuicConnectionStateBase& conn, CongestionControlType type) {
+      QuicConnectionStateBase& conn, CongestionControlType type) override {
     LOG(INFO) << "Creating RLCongestionController";
     conn.transportSettings.pacingEnabled = true;
+    conn.pacer = std::make_unique<TokenlessPacer>(conn, conn.transportSettings.minCwndInMss);
     return std::make_unique<RLCongestionController>(conn, envFactory_);
-  }
+  } 
 
  private:
   std::shared_ptr<CongestionControlEnvFactory> envFactory_;

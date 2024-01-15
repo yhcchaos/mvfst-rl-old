@@ -7,12 +7,12 @@
 *
 */
 #include "CongestionControlLocalEnv.h"
-
+#include <iostream>
 namespace quic {
 
 namespace {
 // This should be polybeast.py --hidden_size + 1
-const int kLSTMHiddenSize = 512 + 1;
+const int kLSTMHiddenSize = 512+2;
 }
 
 CongestionControlLocalEnv::CongestionControlLocalEnv(
@@ -39,7 +39,8 @@ void CongestionControlLocalEnv::onObservation(Observation&& obs, float reward, f
   }
   obs.toTensor(tensor_);
   reward_ = reward;
-  observationReady_ = true;
+  observationReady_ = true; 
+  
   lock.unlock();
   cv_.notify_one();
 }
@@ -63,7 +64,7 @@ void CongestionControlLocalEnv::loop() {
                 << " steps, total return = " << episode_return;
       return;
     }
-
+    
     done = (episode_step == 0);
     episode_return += reward_;
     VLOG(2) << "Episode step = " << episode_step
@@ -73,14 +74,12 @@ void CongestionControlLocalEnv::loop() {
     auto done_tensor = torch::from_blob(&done, {1, 1}, at::kByte);
 
     c10::Dict<std::string, torch::Tensor> input_dict;
-    input_dict.insert("frame", tensor_.reshape({1, 1, -1}));
-    input_dict.insert("reward", std::move(reward_tensor));
-    input_dict.insert("done", std::move(done_tensor));
-
+    input_dict.insert("frame", tensor_.reshape({1, 1, -1})); //size=57
+    input_dict.insert("reward", std::move(reward_tensor)); //size=1
+    input_dict.insert("done", std::move(done_tensor)); //size=1
     std::vector<torch::IValue> inputs{std::move(input_dict),
                                       std::move(core_state)};
     const auto& outputs = module_.forward(inputs).toTuple();
-
     // Outputs: ((action, policy_logits, baseline), core_state)
     const auto& action_tensor =
         outputs->elements()[0].toTuple()->elements()[0].toTensor();

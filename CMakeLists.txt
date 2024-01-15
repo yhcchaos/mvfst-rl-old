@@ -29,7 +29,11 @@ list(APPEND
   ${QUIC_ROOT}/cmake
 )
 
-set(CMAKE_CXX_STANDARD 14)
+find_package(mvfst)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 list(APPEND
   _QUIC_BASE_COMPILE_OPTIONS
@@ -79,8 +83,7 @@ if(BUILD_TESTS)
   enable_testing()
   list(APPEND CMAKE_REQUIRED_INCLUDES "${QUIC_ROOT}/_build/build/googletest/src/googletest/googlemock/include")
   list(APPEND CMAKE_REQUIRED_INCLUDES "${QUIC_ROOT}/_build/build/googletest/src/googletest/googletest/include")
-  list(APPEND REQUIRED_LINK_DIRS "${QUIC_ROOT}/_build/build/googletest/src/googletest-build/googlemock")
-  list(APPEND REQUIRED_LINK_DIRS "${QUIC_ROOT}/_build/build/googletest/src/googletest-build/googlemock/gtest")
+  list(APPEND REQUIRED_LINK_DIRS "${QUIC_ROOT}/_build/deps/lib")
   list(APPEND CMAKE_REQUIRED_LIBRARIES "gmock")
   list(APPEND CMAKE_REQUIRED_LIBRARIES "gtest")
 endif()

@@ -17,9 +17,9 @@ cd ${ROOT}/third-party/grpc
 
 ## This requires libprotobuf to be installed in the conda env.
 ## Otherwise, we could also do this:
-# cd ${ROOT}/third-party/grpc/third_party/protobuf
-# ./autogen.sh && ./configure --prefix=${PREFIX}
-# make && make install && ldconfig
+cd ${ROOT}/third-party/grpc/third_party/protobuf
+./autogen.sh && ./configure --prefix=${PREFIX} 
+make && make install && ldconfig
 
 # Make make find libprotobuf
 export CPATH=${PREFIX}/include:${CPATH}

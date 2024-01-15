@@ -79,7 +79,9 @@ class Net(nn.Module):
 
         # Feature extraction.
         input_size = functools.reduce(operator.mul, observation_shape, 1)
-        self.fc1 = nn.Linear(input_size, hidden_size)
+        input_actor_size = input_size - 9
+        input_value_size = 9
+        self.fc1 = nn.Linear(input_actor_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         
         # FC output size + last reward.
@@ -88,7 +90,7 @@ class Net(nn.Module):
         if use_lstm:
             self.core = nn.LSTM(core_output_size, core_output_size, num_layers=1)
             
-        self.fc3 = nn.Linear(9, core_output_size)
+        self.fc3 = nn.Linear(input_value_size, core_output_size)
         self.fc4 = nn.Linear(core_output_size, core_output_size)
         self.policy = nn.Linear(core_output_size, self.num_actions)
         self.baseline = nn.Linear(core_output_size * 2, 1)
@@ -351,7 +353,7 @@ def train(flags, device="cuda:0"):
         checkpoint = torch.load(flags.checkpoint, map_location=flags.actor_device)
         actor_model.load_state_dict(checkpoint["model_state_dict"])
     actor_model.to(device=flags.actor_device)
-
+    
     # The ActorPool that will accept connections from actor clients.
     actors = actorpool.ActorPool(
         unroll_length=flags.unroll_length,
@@ -522,7 +524,7 @@ def trace_model(flags, model):
     logging.info("Saving traced model to %s", flags.traced_model)
     traced_model.save(flags.traced_model)
 
-    assert flags.traced_model.endswith(".pt"), flags.tracing
+    assert flags.traced_model.endswith(".pt")
     flags_filename = flags.traced_model[:-3] + ".flags.pkl"
     logging.info("Saving flags to %s", flags_filename)
     with open(flags_filename, "wb") as f:

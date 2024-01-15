@@ -20,37 +20,69 @@ emu:
   macros:
     common_param_set: >-
       local --data-dir {data_dir} --pkill-cleanup
-  jobs:
-    ##########################################################################################, 24, 48, 96, 192, 384
-    - scenario: 0
+  jobs: # total_envs = 3200 + 75 + 75 + 120 + 75 = 3430
+    ##########################################################################################
+    - scenario: 0 # envs = 75
       desc: >-
         A training scenario
       params:
-        flows: {{1,2,3}}
-        bandwidth: {{12,24,48,96,192,384}}
-        queue: {{1,4,7,10}}
-        loss_ratio: {{0.005, 0.01, 0.02, 0.04, 0.08, 0.16}}
-        delay: {{5, 25, 45, 65, 85}}
+        flows: [1]
+        bandwidth: ["12-x1", "24-x1", "48-x1", "96-x1", "192-x1"]
+        queue: [0.5, 1, 2, 4, 8, 16]
+        loss_ratio: [0, 0.0001, 0.001, 0.01, 0.05]
+        delay: [1]
       command: >-
         {test_path} {common_param_set} --runtime 30 -f {flows}
-        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
+        --uplink-trace {traces_dir}/wired{bandwidth}-35
+        --downlink-trace {traces_dir}/wired{bandwidth}-35
         --prepend-mm-cmds "mm-delay {delay}"
         --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
         --append-mm-cmds "mm-loss uplink {loss_ratio}"
-    - scenario: 0
+    - scenario: 1 # envs = 120
       desc: >-
         A training scenario
       params:
-        flows: [1,2,3]
-        bandwidth: [12,24,48,96,192,384]
-        queue: [1,4,7,10]
-        loss_ratio: [0.005, 0.01, 0.02, 0.04, 0.08, 0.16]
-        delay: [5, 25, 45, 65, 85]
+        flows: [1]
+        bandwidth: ["12-x2", "24-x2", "24-x0.5", "48-x2", "48-x0.5", "96-x2", "96-x0.5", "192-x0.5"]
+        queue: [0.5, 1, 2, 4, 8, 16]
+        loss_ratio: [0, 0.0001, 0.001, 0.01, 0.05]
+        delay: [1]
       command: >-
         {test_path} {common_param_set} --runtime 30 -f {flows}
-        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
+        --uplink-trace {traces_dir}/wired{bandwidth}-35
+        --downlink-trace {traces_dir}/wired{bandwidth}-35
+        --prepend-mm-cmds "mm-delay {delay}"
+        --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
+        --append-mm-cmds "mm-loss uplink {loss_ratio}"
+    - scenario: 2 # envs = 625
+      desc: >-
+        A training scenario
+      params:
+        flows: [2]
+        bandwidth: ["12-x1", "24-x1", "48-x1", "96-x1", "192-x1"]
+        queue: [1, 2, 4, 8, 16]
+        loss_ratio: [0, 0.0001, 0.001, 0.01, 0.05]
+        delay: [5, 10, 20, 40, 80]
+      command: >-
+        {test_path} {common_param_set} --runtime 30 -f {flows}
+        --uplink-trace {traces_dir}/wired{bandwidth}-35
+        --downlink-trace {traces_dir}/wired{bandwidth}-35
+        --prepend-mm-cmds "mm-delay {delay}"
+        --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
+        --append-mm-cmds "mm-loss uplink {loss_ratio}"
+    - scenario: 3 # envs = 625
+      desc: >-
+        A training scenario
+      params:
+        flows: [3]
+        bandwidth: bandwidth: ["12-x1", "24-x1", "48-x1", "96-x1", "192-x1"]
+        queue: [1, 2, 4, 8, 16]
+        loss_ratio: [0, 0.0001, 0.001, 0.01, 0.05]
+        delay: [5, 10, 20, 40, 80]
+      command: >-
+        {test_path} {common_param_set} --runtime 30 -f {flows}
+        --uplink-trace {traces_dir}/wired{bandwidth}-35
+        --downlink-trace {traces_dir}/wired{bandwidth}-35
         --prepend-mm-cmds "mm-delay {delay}"
         --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
         --append-mm-cmds "mm-loss uplink {loss_ratio}"

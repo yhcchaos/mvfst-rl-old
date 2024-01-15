@@ -74,7 +74,7 @@ def add_pantheon_args(parser):
     parser.add_argument(
         "--run_times",
         type=int,
-        default=3,
+        default=1,
         help="Number of runs per job to average results over in test mode.",
     )
     parser.add_argument(
@@ -160,7 +160,7 @@ def add_polybeast_args(parser):
     parser.add_argument(
         "--observation_length",
         type=int,
-        default=48,
+        default=57,
         help="Length of the observation vector to be fed into the model.",
     )
     parser.add_argument(
@@ -279,7 +279,6 @@ def add_common_args(parser):
     parser.add_argument("--test_name", default="test", type=str)
     parser.add_argument(
         "--traced_model",
-        default="traced_model.pt",
         help="File to write torchscript traced model to (for training) "
         "or read from (for local testing).",
     )

@@ -95,6 +95,7 @@ struct CongestionControlEnvConfig {
    */
   void parseActionsFromString(const std::string& actionsStr);
   static ActionOp charToActionOp(const char op);
+  static char ActionOpToChar(ActionOp action);
 };
 
 }  // namespace quic

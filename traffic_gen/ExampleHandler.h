@@ -9,7 +9,6 @@
 #pragma once
 
 #include <quic/api/QuicSocket.h>
-
 #include <folly/io/IOBufQueue.h>
 #include <folly/io/async/EventBase.h>
 #include <folly/portability/GFlags.h>
@@ -20,8 +19,9 @@ namespace quic {
 namespace traffic_gen {
 
 class ExampleHandler : public quic::QuicSocket::ConnectionCallback,
+                       public quic::QuicSocket::ConnectionSetupCallback, 
                        public quic::QuicSocket::ReadCallback,
-                       public quic::QuicSocket::WriteCallback {
+                       public quic::QuicSocket::WriteCallback{
  public:
   using StreamData = std::pair<folly::IOBufQueue, bool>;
 
@@ -51,10 +51,12 @@ class ExampleHandler : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onConnectionEnd() noexcept override { LOG(INFO) << "Socket closed"; }
+  void onConnectionSetupError(QuicError error) noexcept override {
+    onConnectionError(std::move(error));
+  }
 
-  void onConnectionError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
-    LOG(ERROR) << "Socket error=" << toString(error.first);
+  void onConnectionError(QuicError error) noexcept override {
+    LOG(ERROR) << "Socket error=" << toString(error);
   }
 
   void readAvailable(quic::StreamId id) noexcept override {
@@ -84,10 +86,7 @@ class ExampleHandler : public quic::QuicSocket::ConnectionCallback,
     }
   }
 
-  void readError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void readError(quic::StreamId id, QuicError error) noexcept override {
     LOG(ERROR) << "Got read error on stream=" << id
                << " error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
@@ -99,7 +98,8 @@ class ExampleHandler : public quic::QuicSocket::ConnectionCallback,
     auto responseData = respBuf_->clone();
     bool eof = false;
     auto res =
-        sock->writeChain(id, std::move(responseData), eof, false, nullptr);
+        sock->writeChain(id, std::move(responseData), eof, nullptr);
+
     if (res.hasError()) {
       LOG(ERROR) << "write error=" << toString(res.error());
     } else {
@@ -113,10 +113,7 @@ class ExampleHandler : public quic::QuicSocket::ConnectionCallback,
     response(id, input_[id]);
   }
 
-  void onStreamWriteError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+  void onStreamWriteError(quic::StreamId id, QuicError error) noexcept override {
     LOG(ERROR) << "write error with stream=" << id
                << " error=" << toString(error);
   }

@@ -53,5 +53,20 @@ CongestionControlEnvConfig::ActionOp CongestionControlEnvConfig::charToActionOp(
   }
   __builtin_unreachable();
 }
-
+char CongestionControlEnvConfig::ActionOpToChar(ActionOp action){
+  switch (action) {
+    case ActionOp::NOOP:
+      return '0';
+    case ActionOp::ADD:
+      return '+';
+    case ActionOp::SUB:
+      return '-';
+    case ActionOp::MUL:
+      return '*';
+    case ActionOp::DIV:
+      return '/';
+    default:
+      LOG(FATAL) << "Unknown ActionOp for char: " << int(action);
+  }
+}
 }  // namespace quic

@@ -9,11 +9,10 @@
 #pragma once
 
 #include <glog/logging.h>
-
 #include <quic/server/QuicServer.h>
 #include <quic/server/QuicServerTransport.h>
 #include <quic/server/QuicSharedUDPSocketFactory.h>
-
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <traffic_gen/ExampleHandler.h>
 #include <traffic_gen/Utils.h>
 
@@ -35,17 +34,20 @@ class ExampleServerTransportFactory : public quic::QuicServerTransportFactory {
     }
   }
 
-  ExampleServerTransportFactory() {}
+  ExampleServerTransportFactory(TransportSettings settings_): settings(settings_) {}
 
   quic::QuicServerTransport::Ptr make(
       folly::EventBase* evb, std::unique_ptr<folly::AsyncUDPSocket> sock,
       const folly::SocketAddress&,
+      QuicVersion,
       std::shared_ptr<const fizz::server::FizzServerContext>
-          ctx) noexcept override {
+          ctx) noexcept{
     CHECK_EQ(evb, sock->getEventBase());
     auto exampleHandler = std::make_unique<ExampleHandler>(evb);
     auto transport = quic::QuicServerTransport::make(evb, std::move(sock),
-                                                     *exampleHandler, ctx);
+                                                     exampleHandler.get(), exampleHandler.get(), ctx);
+    //QuicTimer::SharedPtr pacingTimer = std::make_shared<HighResQuicTimer>(evb, settings.pacingTimerResolution);
+
     exampleHandler->setQuicSocket(transport);
     exampleHandlers_.push_back(std::move(exampleHandler));
     return transport;
@@ -54,6 +56,7 @@ class ExampleServerTransportFactory : public quic::QuicServerTransportFactory {
   std::vector<std::unique_ptr<ExampleHandler>> exampleHandlers_;
 
  private:
+  TransportSettings settings;
 };
 
 class ExampleServer {
@@ -64,11 +67,11 @@ class ExampleServer {
       std::shared_ptr<CongestionControllerFactory> ccFactory =
           std::make_shared<DefaultCongestionControllerFactory>())
       : host_(host), port_(port), server_(QuicServer::createQuicServer()) {
+    TransportSettings settings;
     server_->setQuicServerTransportFactory(
-        std::make_unique<ExampleServerTransportFactory>());
+        std::make_unique<ExampleServerTransportFactory>(settings));
     server_->setFizzContext(createTestServerCtx());
     server_->setCongestionControllerFactory(ccFactory);
-    TransportSettings settings;
     settings.defaultCongestionController = cc_algo;
     server_->setTransportSettings(settings);
   }

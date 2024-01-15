@@ -28,9 +28,14 @@ class RLCongestionController : public CongestionController,
       std::shared_ptr<CongestionControlEnvFactory> envFactory);
 
   void onRemoveBytesFromInflight(uint64_t) override;
-  void onPacketSent(const OutstandingPacket& packet) override;
-  void onPacketAckOrLoss(folly::Optional<AckEvent>,
-                         folly::Optional<LossEvent>) override;
+  void onPacketSent(const OutstandingPacketWrapper& packet) override;
+  void onPacketAckOrLoss(
+      const AckEvent* FOLLY_NULLABLE,
+      const LossEvent* FOLLY_NULLABLE) override;
+  void onPacketAckOrLoss(folly::Optional<AckEvent> ack,
+                         folly::Optional<LossEvent> loss){
+    onPacketAckOrLoss(ack.get_pointer(), loss.get_pointer());
+  }
 
   uint64_t getWritableBytes() const noexcept override;
   uint64_t getCongestionWindow() const noexcept override;
@@ -42,7 +47,10 @@ class RLCongestionController : public CongestionController,
   void setAppLimited() override;
 
   bool isAppLimited() const noexcept override;
-
+  void setBandwidthUtilizationFactor(
+      float bandwidthUtilizationFactor) noexcept override;
+  bool isInBackgroundMode() const noexcept override;
+  void getStats(CongestionControllerStats& stats) const override;
  private:
   void onPacketAcked(const AckEvent&);
   void onPacketLoss(const LossEvent&);
@@ -50,9 +58,9 @@ class RLCongestionController : public CongestionController,
   // CongestionControlEnv::Callback
   void onUpdate(const uint64_t& cwndBytes) noexcept override;
 
-  bool setNetworkState(const folly::Optional<AckEvent>& ack,
-                       const folly::Optional<LossEvent>& loss,
-                       NetworkState& obs);
+  bool setNetworkState(const AckEvent* FOLLY_NULLABLE ack,
+                        const LossEvent* FOLLY_NULLABLE loss,
+                        NetworkState& obs);
 
   QuicConnectionStateBase& conn_;
   uint64_t bytesInFlight_{0};

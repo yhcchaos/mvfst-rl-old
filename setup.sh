@@ -93,10 +93,12 @@ function setup_pantheon() {
   python2 -m pip install matplotlib numpy tabulate pyyaml
 
   # Install pantheon tunnel in the conda env.
-  cd third_party/pantheon_tunnel && ./autogen.sh \
-  && make clean \
-  && ./configure --prefix="$PREFIX" \
-  && make -j && sudo make install
+  cd third_party/pantheon_tunnel
+  ./autogen.sh
+  #&& make clean \
+  ./configure --prefix="$PREFIX"
+  make -j
+  sudo make install
 
   # Force-symlink pantheon/third_party/mvfst-rl to $BASE_DIR
   # to avoid double-building
@@ -180,7 +182,7 @@ function setup_grpc() {
 
 
 function setup_torchbeast() {
-  conda install -y pytorch==1.2.0 -c pytorch
+  #conda install -y pytorch==1.2.0 -c pytorch
   echo -e "Installing TorchBeast"
   cd "$TORCHBEAST_DIR"
   python3 -m pip install -r requirements.txt
@@ -197,10 +199,10 @@ function setup_torchbeast() {
 function setup_mvfst() {
   # Build and install mvfst
   echo -e "Installing mvfst"
-  conda install -y cmake=3.14.0
+  #conda install -y cmake=3.14.0
   cd "$MVFST_DIR"
   sudo chmod +x build_helper.sh
-  proxychains ./build_helper.sh "$MVFST_ARGS"
+  ./build_helper.sh "$MVFST_ARGS"
   cd _build/build/ && make install
   echo -e "Done installing mvfst"
 }
@@ -262,17 +264,17 @@ if [ "$MAHI_TUNNEL" = true ]; then
   setup_mahimahi_tunnel
   #setup_pantheon_dependencies
 else
-  git submodule sync && proxychains git submodule update --init --recursive --progress
-  if [ "$INFERENCE" = false ]; then
-    setup_pantheon
-    setup_mahimahi
-    setup_grpc
+  #git submodule sync && proxychains git submodule update --init --recursive --progress
+  #if [ "$INFERENCE" = false ]; then
+    #setup_pantheon
+    #setup_mahimahi
+    #setup_grpc
     setup_torchbeast
-  fi
-  setup_libtorch
-  setup_mvfst
+  #fi
+  #setup_libtorch
+  #setup_mvfst
   echo -e "Building mvfst-rl"
-  sudo chmod +x "$BASE_DIR"/build.sh
+  #sudo chmod +x "$BASE_DIR"/build.sh
   cd "$BASE_DIR" && ./build.sh $BUILD_ARGS
 fi
 

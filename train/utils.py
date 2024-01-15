@@ -14,7 +14,7 @@ import itertools as it
 import shlex
 from train.constants import SRC_DIR, PANTHEON_ROOT
 import subprocess
-
+import os.path as path
 def str2bool(v):
     if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
@@ -54,14 +54,26 @@ def rm_ipcms(actor_id, episode):
     except sysv_ipc.ExistentialError:
         pass
 
-def complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode_id):
-    if type(param_dict["bandwidth"]) == str:
-        bdp = int(param_dict["bandwidth"].split('-')[0]) * 1000 * param_dict["delay"] * 2 / 8 / 1500
-    else:
-        bdp = param_dict["bandwidth"] * 1000 * param_dict["delay"] * 2 / 8 / 1500
+def complete_cmd(flags, param_dict, cmd_tmpl, actor_id, episode_id, job_id):
+    bdp = int(param_dict["bandwidth"].split('-')[0]) * 1000 * param_dict["delay"] * 2 / 8 / 1500
     queueBDP = int(param_dict["queue"] * bdp)
+    if flags.mode=='train':
+        # Expand data_dir in cmd template
+        data_dir = path.join(
+            flags.logdir, "train_tid{}_run{}_expt{}".format(actor_id, episode_id, job_id)
+        )
+    else:
+        data_dir = path.join(flags.logdir, "dataset-gen-mvfst_rl-{}-wired{}-{}-{}-{}".format(
+                                            param_dict["flows"], 
+                                            param_dict["bandwidth"], 
+                                            param_dict["delay"],
+                                            queueBDP, 
+                                            param_dict["loss_ratio"], 
+                                            ))
     cmd_tmpl = safe_format(cmd_tmpl, param_dict)
     cmd = safe_format(cmd_tmpl, {"data_dir": data_dir, "queueBDP": queueBDP})
+    if flags.mode=='train':
+        flags.run_times=1
     extra_sender_args = " ".join(
         [
             "--cc_env_mode={}".format(flags.cc_env_mode),
@@ -82,7 +94,7 @@ def complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode_id):
                 flags.cc_env_reward_packet_loss_factor
             ),
             "-v={}".format(flags.loglevel),
-            "--cc_env_bandwidth={}".format(param_dict['bandwidth']),
+            "--cc_env_bandwidth={}".format(1.0),
             "--cc_env_delay={}".format(param_dict['delay']),
             "--cc_env_loss_ratio={}".format(param_dict['loss_ratio']),
             "--cc_env_flows={}".format(param_dict['flows']),
@@ -97,7 +109,7 @@ def complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode_id):
             '--extra-sender-args="{}"'.format(extra_sender_args)] + \
         (["--schemes=mvfst_rl"] if '--config_file' not in cmd else []) + \
         (["--do_log"] if flags.do_log == True else [])
-    return cmd
+    return cmd, data_dir
 
 def expand_matrix(matrix_cfg):
     input_list = []

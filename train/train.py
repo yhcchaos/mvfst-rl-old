@@ -42,6 +42,7 @@ def get_parser():
 def init_logdirs(flags):
     # Clean run for test mode
     os.makedirs(flags.base_logdir, exist_ok=True)   
+    
     if(flags.mode == "train"):
         flags.logdir = os.path.join(os.path.join(flags.base_logdir, flags.mode))
         checkpoint_dir = os.path.join(flags.logdir, "checkpoints")
@@ -51,13 +52,15 @@ def init_logdirs(flags):
             os.makedirs(checkpoint_dir, exist_ok=True)
         if(flags.checkpoint == None):
             flags.checkpoint = os.path.join(checkpoint_dir, "checkpoint.tar")
-    elif flags.mode == 'test':
+    elif flags.mode == 'test' or flags.mode == 'test_local' :
         flags.logdir = os.path.join(flags.base_logdir, flags.mode, flags.test_name)
+    else:
+        flags.logdir = os.path.join(flags.base_logdir, flags.mode)
+    os.makedirs(flags.logdir, exist_ok=True) 
     
-    flags.traced_model = os.path.join(flags.base_logdir, "traced_model.pt")
-    os.makedirs(flags.logdir, exist_ok=True)  
-    flags.traced_model = os.path.join(flags.base_logdir, "traced_model.pt")
-    if flags.mode != "train":
+    if(flags.traced_model == None) :
+        flags.traced_model = os.path.join(flags.base_logdir, 'trace', "traced_model.pt")
+    if flags.mode != "train" and flags.mode!='test_local':
         assert os.path.exists(
             flags.checkpoint
         ), "Checkpoint {} missing in {} mode".format(flags.checkpoint, flags.mode)
@@ -67,7 +70,7 @@ def run_remote(flags, mode='train'):
     assert((mode == 'train' or mode == 'test') and mode == flags.mode)
     init_logdirs(flags)
     
-    use_cuda = flags.disable_cuda and torch.cuda.is_available()
+    use_cuda = flags.mode=='train' and torch.cuda.is_available()
     device = "cuda:{}".format(flags.gpu_num) if use_cuda  else "cpu" #可以添加一个参数指定cuda
     logging.info(
         "Starting agent on device {}. Mode={}, logdir={}".format(

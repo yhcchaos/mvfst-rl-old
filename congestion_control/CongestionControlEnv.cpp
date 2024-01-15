@@ -63,14 +63,12 @@ CongestionControlEnv::CongestionControlEnv(const Config& cfg, Callback* cob,
   // Initialize history with no-op past actions
   History noopHistory(0.0);
   history_.resize(cfg.historySize, noopHistory);
-  lastTdp_ = 10 * conn_.udpSendPacketLen;
   std::signal(SIGTERM, sighandler);
   std::signal(SIGKILL, sighandler);
   shm_id_actor = shmget((cfg_.actorId << 24) | cfg_.episode_id, sizeof(float) * cfg_.flows, IPC_CREAT | 0666);
   shm_addr_actor = (float*)shmat(shm_id_actor, 0, 0);
   shm_id_link = shmget((cfg_.actorId << 28) | cfg_.episode_id, 2*sizeof(float), IPC_CREAT | 0666);
   shm_addr_link = (float*)shmat(shm_id_link, 0, 0);
-
   if(shm_id_actor == -1 || shm_addr_actor == nullptr || shm_id_link == -1 || shm_addr_actor == nullptr){
     int64_t pgid = getpgid(getpid());
     VLOG(1) << "没有获得共享链路带宽或actor的内存句柄，或共享内存关联失败,杀死该环境中所有流的进程";
@@ -100,7 +98,6 @@ void CongestionControlEnv::onAction(const Action& action) {
     float prevCwndBytes = cwndBytes_;
     updateCwnd(action.cwndAction);
     cob_->onUpdate(cwndBytes_);
-
     // Update history
     history_.pop_front();
     history_.emplace_back(cwndBytes_ / prevCwndBytes - 1);
@@ -109,8 +106,11 @@ void CongestionControlEnv::onAction(const Action& action) {
         std::chrono::steady_clock::now() - lastActionTime_);
     lastActionTime_ = std::chrono::steady_clock::now();
     /*
-    VLOG(1) << "Action updated (cwndAction=" << action.cwndAction
-            << ", cwnd=" << cwndBytes_ / conn_.udpSendPacketLen
+    VLOG(1) << "Action updated (cwndAction= " << action.cwndAction
+            << ", pre cwnd= " << prevCwndBytes
+            << ", cwnd= " << cwndBytes_
+            << ", pre cwnd packets=" << 1.0 * prevCwndBytes / conn_.udpSendPacketLen
+            << ", cwnd packet= "<< 1.0 * cwndBytes_ / conn_.udpSendPacketLen 
             << "), policy elapsed time = " << elapsed.count() << " ms";
     */
   });
@@ -148,25 +148,23 @@ void CongestionControlEnv::handleStates() {
 
   // Compute reward based on original states
   const auto& rewards = computeReward(states_);
-
   Observation obs(cfg_);
   obs.states = useStateSummary() ? stateSummary(states_) : std::move(states_);
   states_.clear();
   //{bw_reward, delay_reward, loss_reward, reward};
   obs.rewards = rewards;
   obs.env.resize(4);
-
   obs.env[0]=shm_addr_link[1] / 10;
   obs.env[1]=cfg_.delay / 10;
   obs.env[2]=cfg_.lossRatio;
   obs.env[3]=cfg_.flows;
   std::copy(history_.begin(), history_.end(), std::back_inserter(obs.history));
-
   VLOG(2) << __func__ << ' ' << obs;
 
   lastObservationTime_ = std::chrono::steady_clock::now();
 
   float episodeWeight = 1.0 / float(cfg_.flows);
+
   onObservation(std::move(obs), rewards[4], episodeWeight);
 }
 
@@ -214,8 +212,6 @@ std::vector<float> CongestionControlEnv::computeReward(
   const auto& elapsed = std::chrono::duration<float, std::milli>(
         std::chrono::steady_clock::now() - lastObservationTime_);
 
-  lastTdp_ = avgGoodput * normBytes() / elapsed.count() * avgLrtt * normMs();
-
   // Undo normalization and convert to Mbps for throughput and ms for
   // delay.
   float goodputMbps = avgGoodput * normBytes() * kBytesToMB / elapsed.count() * 1000 * 8;
@@ -249,7 +245,7 @@ std::vector<float> CongestionControlEnv::computeReward(
   float delay_reward_all =  cfg_.delayFactor * delay_reward * reg;
   float loss_reward =  cfg_.packetLossFactor * (lossMbps - cfg_.lossRatio / (1 - cfg_.lossRatio) * goodputMbps) / bandwidth * float(cfg_.flows);
   float reward = bw_reward - delay_reward_all - loss_reward;
-  if(times % 100 == 0){
+  if(times % 80 == 0){
     VLOG(1) << "change time=" << changeTime
             << ", change bw=" << bandwidth
             << ", flows=" << cfg_.flows 
@@ -281,7 +277,7 @@ void CongestionControlEnv::updateCwnd(const uint32_t actionIdx) {
   const auto& op = cfg_.actions[actionIdx].first;
   const auto& val = cfg_.actions[actionIdx].second;
   const auto& valBytes = val * conn_.udpSendPacketLen;
-
+  // << "op=" << Config::ActionOpToChar(op) << ", val=" << val << ", valBytes=" << valBytes;
   switch (op) {
     case Config::ActionOp::NOOP:
       break;
@@ -301,8 +297,6 @@ void CongestionControlEnv::updateCwnd(const uint32_t actionIdx) {
       LOG(FATAL) << "Unknown ActionOp";
       break;
   }
-
-  cwndBytes_ = std::min(cwndBytes_, std::max(lastTdp_ * 5, uint64_t(100)));
   cwndBytes_ = boundedCwnd(cwndBytes_, conn_.udpSendPacketLen,
                            conn_.transportSettings.maxCwndInMss,
                            conn_.transportSettings.minCwndInMss);

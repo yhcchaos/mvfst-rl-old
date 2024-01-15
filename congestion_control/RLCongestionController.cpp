@@ -40,8 +40,8 @@ void RLCongestionController::onRemoveBytesFromInflight(uint64_t bytes) {
            << conn_;
 }
 
-void RLCongestionController::onPacketSent(const OutstandingPacket& packet) {
-  addAndCheckOverflow(bytesInFlight_, packet.encodedSize);
+void RLCongestionController::onPacketSent(const OutstandingPacketWrapper& packet) {
+  addAndCheckOverflow(bytesInFlight_, packet.metadata.encodedSize);
 
   VLOG(10) << __func__ << " writable=" << getWritableBytes()
            << " cwnd=" << cwndBytes_ << " inflight=" << bytesInFlight_
@@ -50,12 +50,12 @@ void RLCongestionController::onPacketSent(const OutstandingPacket& packet) {
            << " " << conn_;
 }
 
-void RLCongestionController::onPacketAckOrLoss(
-    folly::Optional<AckEvent> ack, folly::Optional<LossEvent> loss) {
+void RLCongestionController::onPacketAckOrLoss(const AckEvent* FOLLY_NULLABLE ack,
+                      const LossEvent* FOLLY_NULLABLE loss){
   if (loss) {
     onPacketLoss(*loss);
   }
-  if (ack && ack->largestAckedPacket.hasValue()) {
+  if (ack) {
     onPacketAcked(*ack);
   }
 
@@ -67,7 +67,6 @@ void RLCongestionController::onPacketAckOrLoss(
 }
 
 void RLCongestionController::onPacketAcked(const AckEvent& ack) {
-  DCHECK(ack.largestAckedPacket.hasValue());
   subtractAndCheckUnderflow(bytesInFlight_, ack.ackedBytes);
   minRTTFilter_.Update(
       conn_.lossState.lrtt,
@@ -108,12 +107,15 @@ void RLCongestionController::onPacketLoss(const LossEvent& loss) {
 
 void RLCongestionController::onUpdate(const uint64_t& cwndBytes) noexcept {
   cwndBytes_ = cwndBytes;
-  conn_.pacer->refreshPacingRate(cwndBytes_, conn_.lossState.srtt);
+  if(conn_.pacer){
+    conn_.pacer->refreshPacingRate(cwndBytes_, conn_.lossState.srtt);
+  }
 }
 
 bool RLCongestionController::setNetworkState(
-    const folly::Optional<AckEvent>& ack,
-    const folly::Optional<LossEvent>& loss, NetworkState& obs) {
+    const AckEvent* FOLLY_NULLABLE ack,
+    const LossEvent* FOLLY_NULLABLE loss,
+    NetworkState& obs) {
   const auto& state = conn_.lossState;
 
   const auto& rttMin = minRTTFilter_.GetBest();
@@ -147,15 +149,13 @@ bool RLCongestionController::setNetworkState(
   obs[Field::RETRANSMITTED] =
       (state.totalBytesRetransmitted - prevTotalBytesRetransmitted_) /
       normBytes;
-
-  if (ack && ack->largestAckedPacket.hasValue()) {
+  if(ack){
     obs[Field::ACKED] = ack->ackedBytes / normBytes;
   }
-
-  if (loss) {
+  if(loss){
     obs[Field::LOST] = loss->lostBytes / normBytes;
   }
-
+  
   // Update prev state values
   prevTotalBytesSent_ = state.totalBytesSent;
   prevTotalBytesRecvd_ = state.totalBytesRecvd;
@@ -197,5 +197,12 @@ void RLCongestionController::setAppLimited() { /* unsupported */
 bool RLCongestionController::isAppLimited() const noexcept {
   return false;  // not supported
 }
+void RLCongestionController::setBandwidthUtilizationFactor(
+      float bandwidthUtilizationFactor) noexcept {}
+bool RLCongestionController::isInBackgroundMode() const noexcept {
+  return false;
+}
+void RLCongestionController:: getStats(CongestionControllerStats& stats) const{
 
+}
 }  // namespace quic

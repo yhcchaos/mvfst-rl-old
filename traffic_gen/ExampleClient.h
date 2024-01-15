@@ -15,19 +15,20 @@
 #include <folly/io/async/ScopedEventBaseThread.h>
 #include <glog/logging.h>
 #include <quic/api/QuicSocket.h>
+#include <folly/io/async/AsyncUDPSocket.h>
 #include <quic/client/QuicClientTransport.h>
-#include <quic/client/handshake/FizzClientQuicHandshakeContext.h>
+#include <quic/fizz/client/handshake/FizzClientQuicHandshakeContext.h>
 #include <quic/congestion_control/CongestionControllerFactory.h>
-
 #include <traffic_gen/Utils.h>
+#include <quic/common/udpsocket/FollyQuicAsyncUDPSocket.h>
 
 namespace quic {
 namespace traffic_gen {
 
 class ExampleClient : public quic::QuicSocket::ConnectionCallback,
+                      public quic::QuicSocket::ConnectionSetupCallback,
                       public quic::QuicSocket::ReadCallback,
-                      public quic::QuicSocket::WriteCallback,
-                      public quic::QuicSocket::DataExpiredCallback {
+                      public quic::QuicSocket::WriteCallback{
  public:
   ExampleClient(const std::string& host, uint16_t port,
                 CongestionControlType cc_algo = CongestionControlType::Cubic,
@@ -50,12 +51,10 @@ class ExampleClient : public quic::QuicSocket::ConnectionCallback,
     VLOG_EVERY_N(2, 1000) << "Client received data="
                           << copy->computeChainDataLength()
                           << " bytes on stream=" << streamId;
-  }
-
+  };
   void readError(
       quic::StreamId streamId,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+      QuicError error) noexcept override {
     LOG(ERROR) << "ExampleClient failed read from stream=" << streamId
                << ", error=" << toString(error);
     // A read error only terminates the ingress portion of the stream state.
@@ -91,13 +90,17 @@ class ExampleClient : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onConnectionError(
-      std::pair<quic::QuicErrorCode, std::string> error) noexcept override {
+      QuicError error) noexcept override {
     LOG_EVERY_N(ERROR, 100) << "ExampleClient error connecting to "
                             << addr_.describe() << " - "
-                            << toString(error.first) << ". Trying again...";
+                            << toString(error) << ". Trying again...";
     connect();
   }
-
+  void onConnectionSetupError(QuicError error) noexcept override{
+    LOG_EVERY_N(ERROR, 100) << "ExampleClient error connect setup"
+                            << toString(error) << ". Trying again...";
+    onConnectionError(error);
+  }
   void onStreamWriteReady(quic::StreamId id,
                           uint64_t maxToSend) noexcept override {
     LOG(INFO) << "ExampleClient socket is write ready with maxToSend="
@@ -106,28 +109,22 @@ class ExampleClient : public quic::QuicSocket::ConnectionCallback,
   }
 
   void onStreamWriteError(
-      quic::StreamId id,
-      std::pair<quic::QuicErrorCode, folly::Optional<folly::StringPiece>>
-          error) noexcept override {
+        StreamId id,
+        QuicError error) noexcept override {
     LOG(ERROR) << "ExampleClient write error with stream=" << id
                << " error=" << toString(error);
   }
 
-  void onDataExpired(StreamId streamId, uint64_t newOffset) noexcept override {
-    LOG(INFO) << "Client received skipData; "
-              << newOffset - recvOffsets_[streamId]
-              << " bytes skipped on stream=" << streamId;
-  }
-
   void connect() {
-    auto sock = std::make_unique<folly::AsyncUDPSocket>(evb_);
+    auto qEvb = std::make_shared<FollyQuicEventBase>(evb_);
+    auto sock = std::make_unique<FollyQuicAsyncUDPSocket>(qEvb);
     auto fizzClientContext =
         FizzClientQuicHandshakeContext::Builder()
             .setCertificateVerifier(
                 std::make_unique<DummyCertificateVerifier>())
             .build();
     quicClient_ = std::make_shared<quic::QuicClientTransport>(
-        evb_, std::move(sock), std::move(fizzClientContext));
+        qEvb, std::move(sock), std::move(fizzClientContext));
     quicClient_->setHostname("example.org");
     quicClient_->addNewPeerAddress(addr_);
     quicClient_->setCongestionControllerFactory(ccFactory_);
@@ -138,13 +135,13 @@ class ExampleClient : public quic::QuicSocket::ConnectionCallback,
     // Often times flow control becomes the bottleneck and prevents accurate
     // analysis of congestion control. Effectively disable it by setting a large
     // window size.
-    settings.advertisedInitialConnectionWindowSize = 1e8;
-    settings.advertisedInitialBidiLocalStreamWindowSize = 1e8;
-    settings.advertisedInitialBidiRemoteStreamWindowSize = 1e8;
-    settings.advertisedInitialUniStreamWindowSize = 1e8;
+    settings.advertisedInitialConnectionFlowControlWindow = 1e8;
+    settings.advertisedInitialBidiLocalStreamFlowControlWindow = 1e8;
+    settings.advertisedInitialBidiRemoteStreamFlowControlWindow = 1e8;
+    settings.advertisedInitialUniStreamFlowControlWindow = 1e8;
 
     quicClient_->setTransportSettings(settings);
-    quicClient_->start(this);
+    quicClient_->start(this, this);
   }
 
   void start() {
@@ -168,15 +165,9 @@ class ExampleClient : public quic::QuicSocket::ConnectionCallback,
  private:
   void sendMessage(quic::StreamId id, folly::IOBufQueue& data) {
     auto message = data.move();
-    auto res = quicClient_->writeChain(id, message->clone(), true, false);
+    auto res = quicClient_->writeChain(id, message->clone(), true);
     if (res.hasError()) {
       LOG(ERROR) << "ExampleClient writeChain error=" << uint32_t(res.error());
-    } else if (res.value()) {
-      LOG(INFO)
-          << "ExampleClient socket did not accept all data, buffering len="
-          << res.value()->computeChainDataLength();
-      data.append(std::move(res.value()));
-      quicClient_->notifyPendingWriteOnStream(id, this);
     } else {
       auto str = message->moveToFbString().toStdString();
       LOG(INFO) << "ExampleClient wrote \"" << str << "\""

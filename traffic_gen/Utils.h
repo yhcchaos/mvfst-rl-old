@@ -12,7 +12,8 @@
 #include <fizz/protocol/CertificateVerifier.h>
 #include <fizz/protocol/clock/test/Mocks.h>
 #include <fizz/server/FizzServerContext.h>
-#include <quic/handshake/QuicFizzFactory.h>
+#include <quic/fizz/handshake/QuicFizzFactory.h>
+#include <fizz/protocol/Certificate.h>
 
 namespace quic {
 namespace traffic_gen {
@@ -21,11 +22,11 @@ class DummyCertificateVerifier : public fizz::CertificateVerifier {
  public:
   ~DummyCertificateVerifier() override = default;
 
-  void verify(const std::vector<std::shared_ptr<const fizz::PeerCert>>&)
+  std::shared_ptr<const folly::AsyncTransportCertificate> verify(
+      const std::vector<std::shared_ptr<const fizz::PeerCert>>& certs)
       const override {
-    return;
+    return certs.front();
   }
-
   std::vector<fizz::Extension> getCertificateRequestExtensions()
       const override {
     return std::vector<fizz::Extension>();

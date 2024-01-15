@@ -604,7 +604,7 @@ class ActorPool {
     builder.RegisterService(&service_);
     server_ = builder.BuildAndStart();
     std::cerr << "Server listening on " << server_address_ << std::endl;
-
+    std::cerr << "Server listening on " << server_address_ << std::endl;
     server_->Wait();
   }
 

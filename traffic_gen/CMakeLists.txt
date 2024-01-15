@@ -5,19 +5,16 @@
 # LICENSE file in the root directory of this source tree.
 #
 add_executable(traffic_gen main.cpp)
-
 target_compile_options(
   traffic_gen
   PRIVATE
   ${_QUIC_COMMON_COMPILE_OPTIONS}
 )
-
 add_dependencies(
   traffic_gen
   mvfst
   rl_congestion_control
 )
-
 target_include_directories(
   traffic_gen PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}

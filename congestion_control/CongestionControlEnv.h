@@ -135,7 +135,6 @@ class CongestionControlEnv {
   uint64_t cwndBytes_;
   std::vector<NetworkState> states_;
   std::deque<History> history_;
-  uint64_t lastTdp_;
 
   // Intermediate tensor to compute state summary
   torch::Tensor summaryTensor_{torch::empty({0}, torch::kFloat32)};

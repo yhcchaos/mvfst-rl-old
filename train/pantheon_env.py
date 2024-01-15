@@ -46,12 +46,8 @@ def train_run(flags, jobs, probs, actor_id):
         else:
             job_id = np.random.choice(range(len(jobs)))
             param_dict, cmd_tmpl = jobs[job_id]
-        # Expand data_dir in cmd template
-        data_dir = path.join(
-            flags.logdir, "train_tid{}_run{}_expt{}".format(actor_id, episode, job_id)
-        )
-        
-        cmd = utils.complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode)
+            
+        cmd, data_dir = utils.complete_cmd(flags, param_dict, cmd_tmpl, actor_id, episode, job_id)
         logging.info(
             "actor_id: {}, episode: {}, job_id: {}, cmd: {}".format(
                 actor_id, episode, job_id, " ".join(cmd)
@@ -70,13 +66,7 @@ def test_run(flags, meta, jobs, job_id):
     param_dict, cmd_tmpl = jobs[job_id]
     episode = 1
     # Expand data_dir in cmd template
-    data_dir = path.join(flags.logdir, "f{},b{},q{:02d},l{:0<6.4f},d{:02d}".format(
-                                        param_dict["flows"], 
-                                        param_dict["bandwidth"], 
-                                        param_dict["queue"], 
-                                        param_dict["loss_ratio"], 
-                                        param_dict["delay"]))
-    cmd = utils.complete_cmd(flags, param_dict, cmd_tmpl, data_dir, actor_id, episode)
+    cmd, data_dir = utils.complete_cmd(flags, param_dict, cmd_tmpl, actor_id, episode, job_id)
     # Run tests
     logging.info(
         "Test run: thread {} -> job {}, cmd: {}".format(

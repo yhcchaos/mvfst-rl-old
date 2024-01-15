@@ -116,7 +116,6 @@ void CongestionControlRPCEnv::loop(const std::string& address) {
     step_pb.set_episode_return(episode_return);
     step_pb.set_episode_weight(episodeWeight_);
     episode_step++;
-
     observationReady_ = false;  // Back to waiting
 
     stream->Write(step_pb);
