@@ -80,6 +80,7 @@ MAHIMAHI_DIR="$DEPS_DIR"/mahimahi
 function setup_pantheon() {
   echo -e "Installing Pantheon dependencies"
   cd "$PANTHEON_DIR"
+  git submodule sync && git submodule update --init --progress third_party/pantheon_tunnel
   sudo apt-get -y install python2.7
   sudo rm /usr/bin/python2
   sudo ln -s /usr/bin/python2.7 /usr/bin/python2
@@ -170,6 +171,7 @@ function setup_grpc() {
   # Note that this gets installed within the conda prefix which needs to be
   # exported to cmake.
   cd "$GRPC_DIR"
+  git submodule sync && git submodule update --init --progress --recursive
   echo -e "Installing grpc"
   conda install -y -c anaconda protobuf=3.12.3
   cd "$BASE_DIR"
@@ -262,7 +264,7 @@ if [ "$MAHI_TUNNEL" = true ]; then
   setup_mahimahi_tunnel
   #setup_pantheon_dependencies
 else
-  git submodule sync && proxychains git submodule update --init --recursive --progress
+  git submodule sync && git submodule update --init --progress
   if [ "$INFERENCE" = false ]; then
     setup_pantheon
     setup_mahimahi

@@ -20,7 +20,7 @@ import time
 import numpy as np
 import itertools as it
 import json
-import train.merge_test_results_module as mtrm
+#import train.merge_test_results_module as mtrm
 import sysv_ipc
 from train.constants import SRC_DIR, PANTHEON_ROOT
 from train import common, utils
@@ -389,9 +389,9 @@ def run_pantheon_test(flags, meta, jobs, num_threads, run_fn):
                 thread.join()
             threads = []
     logging.info("Done with {}.".format(flags.mode))
-    if(flags.merge_results):
-        logging.info("Merge results...")
-        mtrm.merge_test_results(flags.cc_scheme, flags.logdir, flags.num_columns, flags.fig_col, flags.fig_row, flags.dpi)
+ #   if(flags.merge_results):
+  #      logging.info("Merge results...")
+  #      mtrm.merge_test_results(flags.cc_scheme, flags.logdir, flags.num_columns, flags.fig_col, flags.fig_row, flags.dpi)
     
 
 
