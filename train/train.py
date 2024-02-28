@@ -76,7 +76,6 @@ def init_logdirs(flags, other= False):
 
 
 def run_remote(flags, train=True):
-    flags.mode = "train" if train else "test"
     # flags.disable_cuda = not train
     flags.cc_env_mode = "remote"
     cuda = not flags.disable_cuda and torch.cuda.is_available()
@@ -165,6 +164,9 @@ def main(flags):
     elif mode == "test_local":
         # Only local test
         test_local(flags)
+    elif mode == "test_remote":
+        # Only local test
+        run_remote(flags, train=False)
     elif mode == "trace":
         trace(flags)
     else:

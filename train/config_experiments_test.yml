@@ -19,48 +19,14 @@ meta:
 emu:
   macros:
     common_param_set: >-
-      local --data-dir {data_dir} --pkill-cleanup
+      remote {remote_path} --data-dir {data_dir} --pkill-cleanup
   jobs:
     ##########################################################################################, 24, 48, 96, 192, 384
     - scenario: 0
       desc: >-
         A training scenario
-      #the cc scheme, 
-      #when --mode=test, don't need to specify when testing, default is mvfst-rl
-      #when --mode=test and --test_other which means test other traditional cc schemes,
-      # need to specify some cc schemes
-      schemes: [cubic] 
+      schemes: ['mvfst-rl']
       params:
         flows: {{1,2,3}}
-        bandwidth: {{12,24,48,96,192,384}}
-        queue: {{1,4,7,10}}
-        loss_ratio: {{0.005, 0.01, 0.02, 0.04, 0.08, 0.16}}
-        delay: {{5, 25, 45, 65, 85}}
       command: >-
-        {test_path} {common_param_set} --runtime 60 -f {flows}
-        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --prepend-mm-cmds "mm-delay {delay}"
-        --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
-        --append-mm-cmds "mm-loss uplink {loss_ratio}"
-    - scenario: 0
-      desc: >-
-        A training scenario
-      #the cc scheme, 
-      #when --mode=test, don't need to specify when testing, default is mvfst-rl
-      #when --mode=test and --test_other which means test other traditional cc schemes,
-      # need to specify some cc schemes
-      schemes: [cubic] 
-      params:
-        flows: [1,2,3]
-        bandwidth: [12,24,48,96,192,384]
-        queue: [1,4,7,10]
-        loss_ratio: [0.005, 0.01, 0.02, 0.04, 0.08, 0.16]
-        delay: [5, 25, 45, 65, 85]
-      command: >-
-        {test_path} {common_param_set} --runtime 60 -f {flows}
-        --uplink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --downlink-trace {traces_dir}/fix/{bandwidth}mbps.trace
-        --prepend-mm-cmds "mm-delay {delay}"
-        --extra-mm-link-args "--uplink-queue=droptail --uplink-queue-args=packets={queue}"
-        --append-mm-cmds "mm-loss uplink {loss_ratio}"
+        {test_path} {common_param_set} --runtime 60 -f {flows}  --ntp-addr=ntp.aliyun.com

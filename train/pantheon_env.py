@@ -210,6 +210,12 @@ def add_args(parser):
         default="true",
         help="Whether to take max delay over observations in reward (avg otherwise)",
     )
+    parser.add_argument(
+        '--remote_path', 
+        type=str, 
+        default="",
+        metavar='HOST:PANTHEON-DIR',
+        help='HOST ([user@]IP) and PANTHEON-DIR (remote pantheon directory)')
 
 
 def train_run(flags, jobs, thread_id):
@@ -346,7 +352,71 @@ def test_run(flags, meta, jobs, thread_id):
         )
     )
 
+def test_remote_run(flags, meta, jobs, thread_id):
+    job_id = thread_id
+    thread_id = thread_id % flags.num_actors + 1
+    job_cfg, cmd_tmpl = jobs[job_id]
+    episode = 1
+    # Expand data_dir in cmd template
+    data_dir = path.join(flags.logdir, "f{}"
+                         .format(job_cfg["params"]["flows"]))
+    cmd_tmpl = utils.safe_format(cmd_tmpl, job_cfg["params"])
+    logging.error(data_dir)
+    cmd = utils.safe_format(cmd_tmpl, {"data_dir": data_dir, "remote_path": flags.remote_path})
+    cmd = update_cmd(cmd, flags, thread_id, episode)
+    # Run tests
+    logging.info(
+        "Test run: thread {} -> job {}, cmd: {}".format(
+            thread_id, job_id, " ".join(cmd)
+        )
+    )
+    pantheon_env = get_pantheon_env(flags)
+    p = subprocess.Popen(cmd, env=pantheon_env)
+    p.wait()
 
+    # Run analysix
+    analysis_cmd = [meta["analyze_path"], "--data-dir={}".format(data_dir)]
+    logging.info(
+        "Thread {}, job {}: Running analysis on {}, cmd: {}".format(
+            thread_id, job_id, data_dir, " ".join(analysis_cmd)
+        )
+    )
+    p = subprocess.Popen(analysis_cmd, env=pantheon_env)
+    p.wait()
+    
+    try:
+        shm_key_actor = (thread_id << 24) | episode
+        shm_actor = sysv_ipc.SharedMemory(key=shm_key_actor)
+        shm_actor.detach()
+        shm_actor_clean_cmd = ["ipcrm", "-m", "{}".format(shm_actor.id)]
+        p = subprocess.Popen(shm_actor_clean_cmd)
+        p.wait()
+    except sysv_ipc.ExistentialError:
+        pass
+    
+    try:
+        shm_key_link = (thread_id << 28) | episode
+        shm_link = sysv_ipc.SharedMemory(key=shm_key_link)
+        shm_link.detach()
+        shm_link_clean_cmd = ["ipcrm", "-m", "{}".format(shm_link.id)]
+        p = subprocess.Popen(shm_link_clean_cmd)
+        p.wait()
+    except sysv_ipc.ExistentialError:
+        pass
+    '''
+    shutil.copyfile(
+        path.join(data_dir, "pantheon_summary_mean.png"),
+        path.join(flags.logdir, "test_expt{}.png".format(job_id)),
+    )
+    '''
+    logging.info(
+        "Test run finished for thread {}, job {}, Results in {}.".format(
+            thread_id, job_id, data_dir
+        )
+    )
+
+    
+    
 def run_pantheon_train(flags, jobs, num_threads, run_fn):
     logging.info(
         "Launching {} jobs over {} threads for {}.".format(
@@ -406,6 +476,7 @@ def get_pantheon_emulated_jobs(flags):
         # 2. Expand meta
         cmd_tmpl = utils.safe_format(cmd_tmpl, cfg["meta"])
         # 3. Expand parameter combinations for testing
+        logging.error(flags.mode)
         if flags.mode == "train":
             jobs.append((job_cfg, cmd_tmpl))
             with open(os.path.join(flags.logdir, 'train_env_params.json'), 'w') as f:
@@ -453,7 +524,8 @@ def update_cmd(cmd, flags, actor_id, episode_id, params=None):
             schemes = " ".join(params["schemes"])
         else:
             schemes = "mvfst_rl"
-        params = params["params"]
+        if flags.mode=='test':
+            params = params["params"]
         run_times = flags.test_runs_per_job
     extra_sender_args = None
     if not flags.test_other:
@@ -523,13 +595,14 @@ def main(flags):
     else:
         # One thread per job to test
         num_threads = flags.num_actors if flags.num_actors < len(jobs) else len(jobs)
-
+        
     if flags.mode == "train":
         run_pantheon_train(flags, jobs, num_threads, train_run)
-    else:
+    elif flags.mode == "test":
         run_pantheon_test(flags, meta, jobs, num_threads, test_run)
-
-
+    else:
+        run_pantheon_test(flags, meta, jobs, num_threads, test_remote_run)
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pantheon Env Instances")
     common.add_args(parser)

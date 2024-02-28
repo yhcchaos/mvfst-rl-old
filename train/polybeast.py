@@ -727,6 +727,8 @@ def test(flags, **kwargs):
 
 
 def main(flags, device="cuda:0"):
+    if flags.mode=='test_remote':
+        flags.mode='test'
     torch.random.manual_seed(flags.seed)
 
     # We disable batching in learner as unroll lengths could different across

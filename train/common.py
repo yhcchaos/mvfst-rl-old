@@ -11,8 +11,8 @@ def add_args(parser):
     parser.add_argument(
         "--mode",
         default="train",
-        choices=["train", "test", "test_local", "trace"],
-        help="test -> remote test, test_local -> local inference.",
+        choices=["train", "test", "test_local", "test_remote", "trace"],
+        help="test -> remote test, test_local -> local inference., test_remote->test in real world",
     )
     parser.add_argument(
         "--traced_model",
